@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+storage/chroma_db/
+storage/news.db
+.agents/
+.claude/
