@@ -28,13 +28,16 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(va, vb) / denom)
 
 
-def is_relevant(article: dict) -> bool:
+def relevance_score(article: dict) -> float:
     title = article.get("title", "")
     content = article.get("content", "")[:500]
     text = f"{title} {content}".strip()
     article_vec = tools.embedder.embed(text)
-    threshold = config.ARTICLE_FILTER_THRESHOLD
-    return any(
-        _cosine_similarity(article_vec, seed_vec) >= threshold
+    return max(
+        _cosine_similarity(article_vec, seed_vec)
         for seed_vec in _SEED_EMBEDDINGS
     )
+
+
+def is_relevant(article: dict) -> bool:
+    return relevance_score(article) >= config.ARTICLE_FILTER_THRESHOLD

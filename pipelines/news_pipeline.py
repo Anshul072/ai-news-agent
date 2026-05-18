@@ -1,12 +1,16 @@
+import logging
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, END
 
 import config
 from agents.news_parse_agent import parse_articles as _parse_articles
+from tools.article_filter import relevance_score as _relevance_score
 from tools.rss_fetcher import fetch_articles
 from tools.embedder import embed
 from tools.story_clustering import assign_story_group
+
+logger = logging.getLogger(__name__)
 
 
 class _State(TypedDict):
@@ -28,10 +32,13 @@ def _get_field_texts(enriched: dict) -> dict[str, str]:
 
 def build_news_pipeline(sqlite_store, chroma_store):
     def fetch_rss(state: _State) -> dict:
-        return {"raw_articles": fetch_articles(state["feed_urls"])}
+        articles = fetch_articles(state["feed_urls"])
+        logger.info("RSS fetch: %d articles from %d feeds", len(articles), len(state["feed_urls"]))
+        return {"raw_articles": articles}
 
     def dedup_check(state: _State) -> dict:
         new = [a for a in state["raw_articles"] if not sqlite_store.url_hash_exists(a["url_hash"])]
+        logger.info("Dedup: %d new / %d total", len(new), len(state["raw_articles"]))
         return {"new_articles": new}
 
     def parse_articles_node(state: _State) -> dict:
@@ -42,11 +49,28 @@ def build_news_pipeline(sqlite_store, chroma_store):
             if db_article is None:
                 continue
             article_with_id = {**article, "id": db_article["id"]}
+            score = _relevance_score(article_with_id)
+            if score < config.ARTICLE_FILTER_THRESHOLD:
+                logger.warning(
+                    "Article filtered (score=%.3f): %s",
+                    score, article.get("title", "?")[:80],
+                )
+                continue
+            logger.info(
+                "Article passed filter (score=%.3f): %s",
+                score, article.get("title", "?")[:80],
+            )
             try:
                 results = _parse_articles([article_with_id])
-                parsed.extend(results)
-            except Exception:
+                if results:
+                    parsed.extend(results)
+                    logger.info("Parsed: %s", article.get("title", "untitled")[:80])
+                else:
+                    logger.warning("Parse returned empty for: %s", article.get("title", "?")[:60])
+            except Exception as exc:
+                logger.warning("Parse failed for %s: %s", article.get("title", "?")[:60], exc)
                 continue
+        logger.info("Parsing complete: %d articles enriched", len(parsed))
         return {"parsed_articles": parsed}
 
     def cluster_and_store(state: _State) -> dict:
@@ -90,8 +114,11 @@ def build_news_pipeline(sqlite_store, chroma_store):
                     field_embeddings=field_embeddings,
                 )
                 count += 1
-            except Exception:
+                logger.info("Stored article_id=%d (story_group=%d)", article_id, story_group_id)
+            except Exception as exc:
+                logger.warning("Store failed for article_id=%s: %s", item.get("article_id"), exc)
                 continue
+        logger.info("Pipeline complete: %d articles stored", count)
         return {"stored_count": count}
 
     graph = StateGraph(_State)
