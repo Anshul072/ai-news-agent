@@ -1,9 +1,9 @@
-import google.generativeai as genai
+from google import genai
 import config
 
-genai.configure(api_key=config.GEMINI_API_KEY)
+_client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 
 def embed(text: str) -> list[float]:
-    result = genai.embed_content(model="models/text-embedding-004", content=text)
-    return result.embedding
+    result = _client.models.embed_content(model="text-embedding-004", contents=text)
+    return list(result.embeddings[0].values)

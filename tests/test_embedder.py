@@ -11,9 +11,9 @@ from tools.embedder import embed
 def test_embed_returns_list_of_floats():
     mock_values = [0.1] * 768
     mock_result = MagicMock()
-    mock_result.embedding = mock_values
+    mock_result.embeddings = [MagicMock(values=mock_values)]
 
-    with patch("tools.embedder.genai.embed_content", return_value=mock_result):
+    with patch("tools.embedder._client.models.embed_content", return_value=mock_result):
         result = embed("some text about AI")
 
     assert isinstance(result, list)
@@ -26,9 +26,9 @@ def test_embed_returns_list_of_floats():
 
 def test_embed_calls_api_with_correct_model():
     mock_result = MagicMock()
-    mock_result.embedding = [0.0] * 768
+    mock_result.embeddings = [MagicMock(values=[0.0] * 768)]
 
-    with patch("tools.embedder.genai.embed_content", return_value=mock_result) as mock_api:
+    with patch("tools.embedder._client.models.embed_content", return_value=mock_result) as mock_api:
         embed("hello world")
 
     mock_api.assert_called_once()
@@ -43,9 +43,9 @@ def test_embed_calls_api_with_correct_model():
 def test_embed_returns_api_vector():
     expected = [float(i) / 1000 for i in range(768)]
     mock_result = MagicMock()
-    mock_result.embedding = expected
+    mock_result.embeddings = [MagicMock(values=expected)]
 
-    with patch("tools.embedder.genai.embed_content", return_value=mock_result):
+    with patch("tools.embedder._client.models.embed_content", return_value=mock_result):
         result = embed("test")
 
     assert result == expected

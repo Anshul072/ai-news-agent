@@ -1,12 +1,12 @@
 import json
 from datetime import datetime, timezone
 
-import google.generativeai as genai
+from google import genai
 
 import config
 from tools.reddit_fetcher import fetch_reddit_threads
 
-genai.configure(api_key=config.GEMINI_API_KEY)
+_client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 _KEYWORDS_PROMPT = """Given this article title, extract 3-5 concise search keywords suitable for Reddit search.
 Return ONLY a JSON array of strings, no markdown fences.
@@ -41,16 +41,16 @@ _NEUTRAL_SENTINEL = {
 }
 
 
-def _extract_keywords(title: str, model) -> list[str]:
+def _extract_keywords(title: str) -> list[str]:
     prompt = _KEYWORDS_PROMPT.format(title=title)
-    response = model.generate_content(prompt)
+    response = _client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
     return json.loads(response.text)
 
 
-def _analyse_threads(threads: list[dict], model) -> dict:
+def _analyse_threads(threads: list[dict]) -> dict:
     threads_text = json.dumps(threads, indent=2)
     prompt = _SENTIMENT_PROMPT.format(threads=threads_text)
-    response = model.generate_content(prompt)
+    response = _client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
     return json.loads(response.text)
 
 
@@ -61,16 +61,14 @@ def run_sentiment(article_id: int, sqlite_store) -> dict:
         ).fetchone()["url_hash"]
     )
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
-
-    keywords = _extract_keywords(article["title"], model)
+    keywords = _extract_keywords(article["title"])
     threads = fetch_reddit_threads(keywords)
 
     if not threads:
         sentiment = dict(_NEUTRAL_SENTINEL)
     else:
         try:
-            sentiment = _analyse_threads(threads, model)
+            sentiment = _analyse_threads(threads)
         except (json.JSONDecodeError, Exception):
             sentiment = dict(_NEUTRAL_SENTINEL)
         sentiment["thread_count"] = len(threads)

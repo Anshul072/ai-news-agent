@@ -30,12 +30,10 @@ GEMINI_RESPONSE = {
 }
 
 
-def _make_gemini_mock(response_dict: dict):
+def _make_mock_response(response_dict: dict):
     mock_response = MagicMock()
     mock_response.text = json.dumps(response_dict)
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = mock_response
-    return mock_model
+    return mock_response
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +41,8 @@ def _make_gemini_mock(response_dict: dict):
 # ---------------------------------------------------------------------------
 
 def test_parse_articles_returns_enriched_for_each_article():
-    mock_model = _make_gemini_mock(GEMINI_RESPONSE)
-    with patch("agents.news_parse_agent.genai.GenerativeModel", return_value=mock_model):
+    with patch("agents.news_parse_agent._client.models.generate_content",
+               return_value=_make_mock_response(GEMINI_RESPONSE)):
         results = parse_articles([RAW_ARTICLE])
 
     assert len(results) == 1
@@ -55,8 +53,8 @@ def test_parse_articles_returns_enriched_for_each_article():
 # ---------------------------------------------------------------------------
 
 def test_enriched_dict_has_all_required_fields():
-    mock_model = _make_gemini_mock(GEMINI_RESPONSE)
-    with patch("agents.news_parse_agent.genai.GenerativeModel", return_value=mock_model):
+    with patch("agents.news_parse_agent._client.models.generate_content",
+               return_value=_make_mock_response(GEMINI_RESPONSE)):
         results = parse_articles([RAW_ARTICLE])
 
     required = {
@@ -72,8 +70,8 @@ def test_enriched_dict_has_all_required_fields():
 # ---------------------------------------------------------------------------
 
 def test_article_id_is_preserved():
-    mock_model = _make_gemini_mock(GEMINI_RESPONSE)
-    with patch("agents.news_parse_agent.genai.GenerativeModel", return_value=mock_model):
+    with patch("agents.news_parse_agent._client.models.generate_content",
+               return_value=_make_mock_response(GEMINI_RESPONSE)):
         results = parse_articles([RAW_ARTICLE])
 
     assert results[0]["article_id"] == RAW_ARTICLE["id"]
@@ -86,10 +84,9 @@ def test_article_id_is_preserved():
 def test_malformed_gemini_response_skipped():
     mock_response = MagicMock()
     mock_response.text = "not valid json {{{}"
-    mock_model = MagicMock()
-    mock_model.generate_content.return_value = mock_response
 
-    with patch("agents.news_parse_agent.genai.GenerativeModel", return_value=mock_model):
+    with patch("agents.news_parse_agent._client.models.generate_content",
+               return_value=mock_response):
         results = parse_articles([RAW_ARTICLE])
 
     assert results == []
@@ -104,8 +101,8 @@ def test_multiple_articles_all_processed():
         {**RAW_ARTICLE, "id": 1},
         {**RAW_ARTICLE, "id": 2, "url": "https://example.com/gemini"},
     ]
-    mock_model = _make_gemini_mock(GEMINI_RESPONSE)
-    with patch("agents.news_parse_agent.genai.GenerativeModel", return_value=mock_model):
+    with patch("agents.news_parse_agent._client.models.generate_content",
+               return_value=_make_mock_response(GEMINI_RESPONSE)):
         results = parse_articles(articles)
 
     assert len(results) == 2

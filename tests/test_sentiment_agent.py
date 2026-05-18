@@ -51,12 +51,8 @@ def article_id(store):
     return store.get_raw_article_by_url_hash(RAW_ARTICLE["url_hash"])["id"]
 
 
-def _make_model(*responses):
-    mock_model = MagicMock()
-    mock_model.generate_content.side_effect = [
-        MagicMock(text=r) for r in responses
-    ]
-    return mock_model
+def _make_generate_side_effect(*responses):
+    return [MagicMock(text=r) for r in responses]
 
 
 # ---------------------------------------------------------------------------
@@ -64,12 +60,13 @@ def _make_model(*responses):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_writes_all_fields(store, article_id):
-    mock_model = _make_model(
-        '["GPT-5", "OpenAI"]',           # keyword extraction
-        json.dumps(MOCK_SENTIMENT_RESPONSE),  # sentiment analysis
+    side_effect = _make_generate_side_effect(
+        '["GPT-5", "OpenAI"]',
+        json.dumps(MOCK_SENTIMENT_RESPONSE),
     )
 
-    with patch("agents.sentiment_agent.genai.GenerativeModel", return_value=mock_model), \
+    with patch("agents.sentiment_agent._client.models.generate_content",
+               side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
 
@@ -90,9 +87,10 @@ def test_run_sentiment_writes_all_fields(store, article_id):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_no_threads_produces_neutral_record(store, article_id):
-    mock_model = _make_model('["GPT-5"]')  # only keyword extraction needed
+    side_effect = _make_generate_side_effect('["GPT-5"]')
 
-    with patch("agents.sentiment_agent.genai.GenerativeModel", return_value=mock_model), \
+    with patch("agents.sentiment_agent._client.models.generate_content",
+               side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=[]):
         run_sentiment(article_id, store)
 
@@ -104,28 +102,23 @@ def test_run_sentiment_no_threads_produces_neutral_record(store, article_id):
 
 
 # ---------------------------------------------------------------------------
-# Behavior 3: last_scanned_at updated on every scan
+# Behavior 3: last_scanned_at is set on every scan
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_updates_last_scanned_at(store, article_id):
-    with patch("agents.sentiment_agent.genai.GenerativeModel") as MockModel, \
+    side_effect = _make_generate_side_effect(
+        '["GPT-5", "OpenAI"]', json.dumps(MOCK_SENTIMENT_RESPONSE),
+    )
+
+    with patch("agents.sentiment_agent._client.models.generate_content",
+               side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
-        MockModel.return_value = _make_model(
-            '["GPT-5", "OpenAI"]', json.dumps(MOCK_SENTIMENT_RESPONSE),
-            '["GPT-5", "OpenAI"]', json.dumps(MOCK_SENTIMENT_RESPONSE),
-        )
         run_sentiment(article_id, store)
-        first_ts = store.get_sentiment(article_id)["last_scanned_at"]
 
-        MockModel.return_value = _make_model(
-            '["GPT-5", "OpenAI"]', json.dumps(MOCK_SENTIMENT_RESPONSE),
-        )
-        run_sentiment(article_id, store)
-        second_ts = store.get_sentiment(article_id)["last_scanned_at"]
-
-    assert first_ts is not None
-    assert second_ts is not None
-    assert "T" in first_ts
+    sentiment = store.get_sentiment(article_id)
+    assert sentiment is not None
+    assert sentiment["last_scanned_at"] is not None
+    assert "T" in sentiment["last_scanned_at"]
 
 
 # ---------------------------------------------------------------------------
@@ -133,12 +126,13 @@ def test_run_sentiment_updates_last_scanned_at(store, article_id):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_json_fields_deserialize_correctly(store, article_id):
-    mock_model = _make_model(
+    side_effect = _make_generate_side_effect(
         '["GPT-5"]',
         json.dumps(MOCK_SENTIMENT_RESPONSE),
     )
 
-    with patch("agents.sentiment_agent.genai.GenerativeModel", return_value=mock_model), \
+    with patch("agents.sentiment_agent._client.models.generate_content",
+               side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
 

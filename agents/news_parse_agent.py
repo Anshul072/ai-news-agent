@@ -1,10 +1,10 @@
 import json
 
-import google.generativeai as genai
+from google import genai
 
 import config
 
-genai.configure(api_key=config.GEMINI_API_KEY)
+_client = genai.Client(api_key=config.GEMINI_API_KEY)
 
 _PROMPT_TEMPLATE = """You are an AI news analyst. Given the article below, extract structured information and return ONLY valid JSON with these exact keys:
 
@@ -24,7 +24,6 @@ Return ONLY the JSON object, no markdown fences."""
 
 
 def parse_articles(articles: list[dict]) -> list[dict]:
-    model = genai.GenerativeModel("gemini-1.5-flash")
     results = []
     for article in articles:
         prompt = _PROMPT_TEMPLATE.format(
@@ -32,7 +31,7 @@ def parse_articles(articles: list[dict]) -> list[dict]:
             content=article.get("content", ""),
         )
         try:
-            response = model.generate_content(prompt)
+            response = _client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
             enriched = json.loads(response.text)
             enriched["article_id"] = article["id"]
             results.append(enriched)
