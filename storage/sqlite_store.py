@@ -90,6 +90,12 @@ class SQLiteStore:
         )
         conn.commit()
 
+    def get_raw_article(self, article_id: int) -> dict | None:
+        row = self._get_conn().execute(
+            "SELECT * FROM raw_articles WHERE id = ?", (article_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
     def get_raw_article_by_url_hash(self, url_hash: str) -> dict | None:
         row = self._get_conn().execute(
             "SELECT * FROM raw_articles WHERE url_hash = ?", (url_hash,)
@@ -220,6 +226,62 @@ class SQLiteStore:
         result["notable_quotes"] = json.loads(result["notable_quotes"] or "[]")
         result["subreddit_breakdown"] = json.loads(result["subreddit_breakdown"] or "{}")
         return result
+
+    def get_story_clusters(self) -> list[dict]:
+        """Returns story clusters ordered by max importance_score descending."""
+        from collections import defaultdict
+        conn = self._get_conn()
+        rows = conn.execute(
+            """
+            SELECT r.id AS article_id, r.title, r.source_name, r.published_at,
+                   e.story_group_id, e.summary, e.whats_new, e.key_concepts,
+                   e.concept_explanations, e.who_made_it, e.use_cases,
+                   e.importance_score, e.importance_reasoning,
+                   s.sentiment_label, s.sentiment_score, s.excitement_level,
+                   s.top_concerns, s.top_use_cases, s.notable_quotes,
+                   s.subreddit_breakdown, s.thread_count, s.total_comments
+            FROM raw_articles r
+            JOIN enriched_articles e ON e.article_id = r.id
+            LEFT JOIN article_sentiment s ON s.article_id = r.id
+            WHERE e.story_group_id IS NOT NULL
+            ORDER BY e.importance_score DESC
+            """
+        ).fetchall()
+
+        groups: dict = defaultdict(list)
+        for row in rows:
+            d = dict(row)
+            d["key_concepts"] = json.loads(d["key_concepts"] or "[]")
+            d["concept_explanations"] = json.loads(d["concept_explanations"] or "{}")
+            d["use_cases"] = json.loads(d["use_cases"] or "[]")
+            d["top_concerns"] = json.loads(d["top_concerns"] or "[]")
+            d["top_use_cases"] = json.loads(d["top_use_cases"] or "[]")
+            d["notable_quotes"] = json.loads(d["notable_quotes"] or "[]")
+            d["subreddit_breakdown"] = json.loads(d["subreddit_breakdown"] or "{}")
+            groups[d["story_group_id"]].append(d)
+
+        clusters = []
+        for story_group_id, articles in groups.items():
+            best = articles[0]
+            sg = self.get_story_group(story_group_id)
+            source_count = sg["source_count"] if sg else len(articles)
+            source_names = list(dict.fromkeys(a["source_name"] for a in articles))
+            published_dates = [a["published_at"] for a in articles if a["published_at"]]
+            clusters.append({
+                "story_group_id": story_group_id,
+                "title": best["title"],
+                "importance_score": best["importance_score"],
+                "sentiment_label": best.get("sentiment_label"),
+                "sentiment_score": best.get("sentiment_score"),
+                "source_count": source_count,
+                "source_names": source_names,
+                "published_at_min": min(published_dates) if published_dates else None,
+                "published_at_max": max(published_dates) if published_dates else None,
+                "articles": articles,
+            })
+
+        clusters.sort(key=lambda c: c["importance_score"] or 0, reverse=True)
+        return clusters
 
     def get_recent_enriched_articles(self, days: int = 7) -> list[dict]:
         from datetime import timedelta
