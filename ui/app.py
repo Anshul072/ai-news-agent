@@ -161,7 +161,7 @@ def render_chat(sqlite_store: SQLiteStore, chroma_store: ChromaStore) -> None:
             st.write(query)
         with st.chat_message("assistant"):
             with st.spinner("Searching knowledge base…"):
-                result = answer_query(query, sqlite_store, chroma_store)
+                result = answer_query(query, sqlite_store, chroma_store, history=st.session_state.chat_history)
             answer = result.get("answer", "")
             citations = result.get("citations", [])
 

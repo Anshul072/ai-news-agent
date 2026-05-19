@@ -40,9 +40,11 @@ def _fake_embed(text: str) -> list[float]:
 
 
 def _make_mock_response(answer: str, cited_ids: list):
-    mock_response = MagicMock()
-    mock_response.text = json.dumps({"answer": answer, "cited_ids": cited_ids})
-    return mock_response
+    mock = MagicMock()
+    mock.choices = [MagicMock(message=MagicMock(
+        content=json.dumps({"answer": answer, "cited_ids": cited_ids})
+    ))]
+    return mock
 
 
 @pytest.fixture
@@ -84,7 +86,7 @@ def test_answer_query_returns_answer_and_citations(sqlite_store, chroma_store):
     article_id = _seed(sqlite_store, chroma_store)
 
     with patch("agents.rag_agent.embed", side_effect=_fake_embed), \
-         patch("agents.rag_agent._client.models.generate_content",
+         patch("agents.rag_agent._client.chat.completions.create",
                return_value=_make_mock_response("GPT-5 is great.", [article_id])):
         from agents.rag_agent import answer_query
         result = answer_query("tell me about GPT-5", sqlite_store, chroma_store)
@@ -103,7 +105,7 @@ def test_answer_query_citations_reference_real_article_ids(sqlite_store, chroma_
     article_id = _seed(sqlite_store, chroma_store)
 
     with patch("agents.rag_agent.embed", side_effect=_fake_embed), \
-         patch("agents.rag_agent._client.models.generate_content",
+         patch("agents.rag_agent._client.chat.completions.create",
                return_value=_make_mock_response("GPT-5 is great.", [article_id])):
         from agents.rag_agent import answer_query
         result = answer_query("tell me about GPT-5", sqlite_store, chroma_store)
@@ -127,19 +129,47 @@ def test_answer_query_returns_no_data_message_when_empty(sqlite_store, chroma_st
 
 
 # ---------------------------------------------------------------------------
-# Behavior 4: the Gemini prompt contains article context from SQLite
+# Behavior 4: the prompt contains article context from SQLite
 # ---------------------------------------------------------------------------
 
-def test_answer_query_passes_article_context_to_gemini(sqlite_store, chroma_store):
+def test_answer_query_passes_article_context_to_llm(sqlite_store, chroma_store):
     article_id = _seed(sqlite_store, chroma_store)
 
     with patch("agents.rag_agent.embed", side_effect=_fake_embed), \
-         patch("agents.rag_agent._client.models.generate_content",
-               return_value=_make_mock_response("GPT-5 is great.", [article_id])) as mock_generate:
+         patch("agents.rag_agent._client.chat.completions.create",
+               return_value=_make_mock_response("GPT-5 is great.", [article_id])) as mock_create:
         from agents.rag_agent import answer_query
         answer_query("tell me about GPT-5", sqlite_store, chroma_store)
 
-    call_kwargs = mock_generate.call_args.kwargs
-    prompt_text = call_kwargs["contents"]
-    assert "GPT-5 Released" in prompt_text
-    assert "tell me about GPT-5" in prompt_text
+    call_kwargs = mock_create.call_args.kwargs
+    messages = call_kwargs["messages"]
+    assert messages[0]["role"] == "system"
+    assert "GPT-5 Released" in messages[0]["content"]
+    assert messages[-1]["role"] == "user"
+    assert messages[-1]["content"] == "tell me about GPT-5"
+
+
+# ---------------------------------------------------------------------------
+# Behavior 5: conversation history is included in messages when provided
+# ---------------------------------------------------------------------------
+
+def test_answer_query_includes_history_in_messages(sqlite_store, chroma_store):
+    article_id = _seed(sqlite_store, chroma_store)
+
+    history = [
+        {"question": "What is GPT-5?", "answer": "GPT-5 is OpenAI's latest model.", "citations": []},
+        {"question": "Who made it?", "answer": "OpenAI made it.", "citations": []},
+    ]
+
+    with patch("agents.rag_agent.embed", side_effect=_fake_embed), \
+         patch("agents.rag_agent._client.chat.completions.create",
+               return_value=_make_mock_response("OpenAI.", [article_id])) as mock_create:
+        from agents.rag_agent import answer_query
+        answer_query("Tell me more.", sqlite_store, chroma_store, history=history)
+
+    messages = mock_create.call_args.kwargs["messages"]
+    roles = [m["role"] for m in messages]
+    assert roles == ["system", "user", "assistant", "user", "assistant", "user"]
+    assert messages[1]["content"] == "What is GPT-5?"
+    assert messages[2]["content"] == "GPT-5 is OpenAI's latest model."
+    assert messages[-1]["content"] == "Tell me more."
