@@ -1,12 +1,13 @@
 import json
 from datetime import datetime, timezone
 
-from google import genai
+from groq import Groq
 
 import config
 from tools.reddit_fetcher import fetch_reddit_threads
 
-_client = genai.Client(api_key=config.GEMINI_API_KEY)
+_client = Groq(api_key=config.GROQ_API_KEY)
+_MODEL = "llama-3.3-70b-versatile"
 
 _KEYWORDS_PROMPT = """Given this article title, extract 3-5 concise search keywords suitable for Reddit search.
 Return ONLY a JSON array of strings, no markdown fences.
@@ -41,17 +42,32 @@ _NEUTRAL_SENTINEL = {
 }
 
 
+def _strip_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text[text.index("\n") + 1:] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+    return text.strip()
+
+
+def _call_groq(prompt: str) -> str:
+    response = _client.chat.completions.create(
+        model=_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content
+
+
 def _extract_keywords(title: str) -> list[str]:
     prompt = _KEYWORDS_PROMPT.format(title=title)
-    response = _client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
-    return json.loads(response.text)
+    return json.loads(_strip_fences(_call_groq(prompt)))
 
 
 def _analyse_threads(threads: list[dict]) -> dict:
     threads_text = json.dumps(threads, indent=2)
     prompt = _SENTIMENT_PROMPT.format(threads=threads_text)
-    response = _client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
-    return json.loads(response.text)
+    return json.loads(_strip_fences(_call_groq(prompt)))
 
 
 def run_sentiment(article_id: int, sqlite_store) -> dict:

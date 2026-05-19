@@ -3,7 +3,7 @@ import sys
 
 # Inject fake API keys before any module that calls `import config` at load time.
 _FAKE_ENV = {
-    "GEMINI_API_KEY": "fake-gemini-key",
+    "GROQ_API_KEY": "fake-groq-key",
     "REDDIT_CLIENT_ID": "fake-reddit-id",
     "REDDIT_CLIENT_SECRET": "fake-reddit-secret",
     "REDDIT_USER_AGENT": "fake-agent/1.0",

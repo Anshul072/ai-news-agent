@@ -10,6 +10,9 @@ def fetch_reddit_threads(
     time_filter: str = "month",
     top_comments_per_thread: int = 3,
 ) -> list[dict]:
+    if not config.REDDIT_CLIENT_ID or not config.REDDIT_CLIENT_SECRET:
+        return []
+
     if subreddits is None:
         subreddits = config.SUBREDDITS
 

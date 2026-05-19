@@ -51,8 +51,11 @@ def article_id(store):
     return store.get_raw_article_by_url_hash(RAW_ARTICLE["url_hash"])["id"]
 
 
-def _make_generate_side_effect(*responses):
-    return [MagicMock(text=r) for r in responses]
+def _make_groq_side_effect(*responses):
+    return [
+        MagicMock(choices=[MagicMock(message=MagicMock(content=r))])
+        for r in responses
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -60,12 +63,12 @@ def _make_generate_side_effect(*responses):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_writes_all_fields(store, article_id):
-    side_effect = _make_generate_side_effect(
+    side_effect = _make_groq_side_effect(
         '["GPT-5", "OpenAI"]',
         json.dumps(MOCK_SENTIMENT_RESPONSE),
     )
 
-    with patch("agents.sentiment_agent._client.models.generate_content",
+    with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
@@ -87,9 +90,9 @@ def test_run_sentiment_writes_all_fields(store, article_id):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_no_threads_produces_neutral_record(store, article_id):
-    side_effect = _make_generate_side_effect('["GPT-5"]')
+    side_effect = _make_groq_side_effect('["GPT-5"]')
 
-    with patch("agents.sentiment_agent._client.models.generate_content",
+    with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=[]):
         run_sentiment(article_id, store)
@@ -106,11 +109,11 @@ def test_run_sentiment_no_threads_produces_neutral_record(store, article_id):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_updates_last_scanned_at(store, article_id):
-    side_effect = _make_generate_side_effect(
+    side_effect = _make_groq_side_effect(
         '["GPT-5", "OpenAI"]', json.dumps(MOCK_SENTIMENT_RESPONSE),
     )
 
-    with patch("agents.sentiment_agent._client.models.generate_content",
+    with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
@@ -126,12 +129,12 @@ def test_run_sentiment_updates_last_scanned_at(store, article_id):
 # ---------------------------------------------------------------------------
 
 def test_run_sentiment_json_fields_deserialize_correctly(store, article_id):
-    side_effect = _make_generate_side_effect(
+    side_effect = _make_groq_side_effect(
         '["GPT-5"]',
         json.dumps(MOCK_SENTIMENT_RESPONSE),
     )
 
-    with patch("agents.sentiment_agent._client.models.generate_content",
+    with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
          patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)

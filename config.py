@@ -17,6 +17,6 @@ SUBREDDITS = os.environ.get("SUBREDDITS", "artificial,MachineLearning,LocalLLaMA
 NEWS_SCHEDULE = os.environ.get("NEWS_SCHEDULE", "0 23 * * 1,3,5")
 SENTIMENT_SCHEDULE = os.environ.get("SENTIMENT_SCHEDULE", "0 8 * * *")
 
-CLUSTERING_THRESHOLD = float(os.environ.get("CLUSTERING_THRESHOLD", "0.85"))
+CLUSTERING_THRESHOLD = float(os.environ.get("CLUSTERING_THRESHOLD", "0.75"))
 SENTIMENT_WINDOW_DAYS = int(os.environ.get("SENTIMENT_WINDOW_DAYS", "7"))
 ARTICLE_FILTER_THRESHOLD = float(os.environ.get("ARTICLE_FILTER_THRESHOLD", "0.45"))

@@ -1,0 +1,8 @@
+[server]
+# Disable file watcher entirely: Streamlit's module introspector walks sys.modules,
+# triggering transformers' lazy imports of torchvision-dependent vision models that
+# aren't installed (we only need sentence_transformers for text embedding).
+fileWatcherType = "none"
+
+[logger]
+level = "warning"
