@@ -25,8 +25,10 @@ from scheduler import trigger_news_pipeline, trigger_sentiment_pipeline
 
 st.set_page_config(page_title="AI News Agent", layout="wide")
 
-# Cross-thread state: background pipeline threads write here; main thread reads on each rerun.
-_pipeline_result: dict = {"status": "", "error": ""}
+@st.cache_resource
+def _pipeline_result() -> dict:
+    # Survives Streamlit hot-reloads; background threads write here, main thread reads on each rerun.
+    return {"status": "", "error": ""}
 
 
 @st.cache_resource
@@ -202,11 +204,12 @@ def render_sidebar() -> None:
         st.subheader("Pipelines")
 
         # Sync cross-thread result into session_state (background threads can't touch session_state directly)
-        if _pipeline_result["status"]:
-            st.session_state.pipeline_status = _pipeline_result["status"]
-            st.session_state.pipeline_error = _pipeline_result["error"]
-            _pipeline_result["status"] = ""
-            _pipeline_result["error"] = ""
+        _result = _pipeline_result()
+        if _result["status"]:
+            st.session_state.pipeline_status = _result["status"]
+            st.session_state.pipeline_error = _result["error"]
+            _result["status"] = ""
+            _result["error"] = ""
 
         if "pipeline_status" not in st.session_state:
             st.session_state.pipeline_status = ""
@@ -223,13 +226,13 @@ def render_sidebar() -> None:
 
         status = st.session_state.get("pipeline_status", "")
         if status == "news_running":
-            st.info("⏳ Fetching news… feed refreshes automatically")
+            st.info("⏳ Fetching news…")
         elif status == "sentiment_running":
-            st.info("⏳ Analysing sentiment… feed refreshes automatically")
+            st.info("⏳ Analysing sentiment…")
         elif status == "news_done":
-            st.success("✅ News pipeline complete")
+            st.success("✅ News fetch complete")
         elif status == "sentiment_done":
-            st.success("✅ Sentiment pipeline complete")
+            st.success("✅ Sentiment analysis complete")
         elif status == "news_error":
             st.error(f"❌ News pipeline failed: {st.session_state.get('pipeline_error', '')}")
         elif status == "sentiment_error":
@@ -241,19 +244,21 @@ def render_sidebar() -> None:
 def _run_news():
     try:
         trigger_news_pipeline()
-        _pipeline_result["status"] = "news_done"
+        _pipeline_result()["status"] = "news_done"
     except Exception as exc:
-        _pipeline_result["status"] = "news_error"
-        _pipeline_result["error"] = str(exc)
+        result = _pipeline_result()
+        result["status"] = "news_error"
+        result["error"] = str(exc)
 
 
 def _run_sentiment():
     try:
         trigger_sentiment_pipeline()
-        _pipeline_result["status"] = "sentiment_done"
+        _pipeline_result()["status"] = "sentiment_done"
     except Exception as exc:
-        _pipeline_result["status"] = "sentiment_error"
-        _pipeline_result["error"] = str(exc)
+        result = _pipeline_result()
+        result["status"] = "sentiment_error"
+        result["error"] = str(exc)
 
 
 def main():
