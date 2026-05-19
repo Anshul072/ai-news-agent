@@ -3,6 +3,7 @@ import logging
 import time
 
 from groq import Groq
+from json_repair import repair_json
 
 import config
 
@@ -80,7 +81,18 @@ def _safe_parse(text: str, title_hint: str) -> dict | None:
         except json.JSONDecodeError:
             pass
 
-    # 3. Distinguish truncated responses from outright garbage
+    # 3. Attempt structural repair (handles unquoted values, trailing commas, etc.)
+    try:
+        repaired = repair_json(extracted or text, return_objects=True)
+        if isinstance(repaired, (dict, list)):
+            result = _normalize(repaired, title_hint)
+            if result is not None:
+                logger.info("JSON repaired for: %s", title_hint)
+                return result
+    except Exception:
+        pass
+
+    # 4. Distinguish truncated responses from outright garbage
     if _is_truncated(text):
         logger.warning("Truncated JSON (token limit?) for: %s", title_hint)
         return None

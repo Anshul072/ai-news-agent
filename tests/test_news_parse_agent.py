@@ -120,10 +120,11 @@ def test_multiple_articles_all_processed():
 
 
 # ---------------------------------------------------------------------------
-# Behavior 6: truncated JSON (unclosed braces) is skipped without crash
+# Behavior 6: truncated JSON is repaired and returned with partial data + defaults
 # ---------------------------------------------------------------------------
 
-def test_truncated_json_skipped():
+def test_truncated_json_repaired_with_defaults():
+    # json-repair closes unclosed strings/braces; missing fields get defaults
     mock = MagicMock()
     mock.choices = [MagicMock(message=MagicMock(content='{"summary": "partial...'))]
 
@@ -131,7 +132,9 @@ def test_truncated_json_skipped():
                return_value=mock):
         results = parse_articles([RAW_ARTICLE])
 
-    assert results == []
+    assert len(results) == 1
+    assert "partial" in results[0]["summary"]
+    assert results[0]["key_concepts"] == []   # default for missing field
 
 
 # ---------------------------------------------------------------------------
@@ -232,3 +235,33 @@ def test_prose_wrapped_json_is_extracted():
         results = parse_articles([RAW_ARTICLE])
 
     assert len(results) == 1
+
+
+# ---------------------------------------------------------------------------
+# Behavior 12: unquoted string values are repaired and parsed successfully
+# ---------------------------------------------------------------------------
+
+def test_unquoted_string_values_are_repaired():
+    # Simulate the real failure: LLM omits quotes around string values
+    malformed = (
+        '{\n'
+        '  "summary": Elon Musk lost a lawsuit against OpenAI due to a unanimous verdict,\n'
+        '  "whats_new": The court ruled against Musk on all claims,\n'
+        '  "key_concepts": ["lawsuit", "OpenAI", "verdict"],\n'
+        '  "concept_explanations": {"lawsuit": "Legal action."},\n'
+        '  "who_made_it": OpenAI,\n'
+        '  "use_cases": ["legal precedent"],\n'
+        '  "importance_score": 8,\n'
+        '  "importance_reasoning": Major ruling in AI governance\n'
+        '}'
+    )
+    mock = MagicMock()
+    mock.choices = [MagicMock(message=MagicMock(content=malformed))]
+
+    with patch("agents.news_parse_agent._client.chat.completions.create",
+               return_value=mock):
+        results = parse_articles([RAW_ARTICLE])
+
+    assert len(results) == 1
+    assert "Musk" in results[0]["summary"] or results[0]["summary"] != ""
+    assert results[0]["importance_score"] == 8
