@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, END
@@ -32,8 +33,17 @@ def _get_field_texts(enriched: dict) -> dict[str, str]:
 
 def build_news_pipeline(sqlite_store, chroma_store):
     def fetch_rss(state: _State) -> dict:
-        articles = fetch_articles(state["feed_urls"])
-        logger.info("RSS fetch: %d articles from %d feeds", len(articles), len(state["feed_urls"]))
+        since_str = sqlite_store.get_last_fetch_time()
+        if since_str:
+            since = datetime.fromisoformat(since_str)
+            if since.tzinfo is None:
+                since = since.replace(tzinfo=timezone.utc)
+            label = f"since {since_str[:10]}"
+        else:
+            since = datetime.now(timezone.utc) - timedelta(days=7)
+            label = "first run (last 7 days)"
+        articles = fetch_articles(state["feed_urls"], since=since)
+        logger.info("RSS fetch: %d articles from %d feeds (%s)", len(articles), len(state["feed_urls"]), label)
         return {"raw_articles": articles}
 
     def dedup_check(state: _State) -> dict:

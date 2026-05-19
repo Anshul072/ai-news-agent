@@ -68,18 +68,28 @@ def test_get_story_clusters_single_cluster(store):
 
 
 # ---------------------------------------------------------------------------
-# Behavior 3: multiple clusters ordered by importance_score descending
+# Behavior 3: clusters ordered by date descending, then importance descending
 # ---------------------------------------------------------------------------
 
-def test_get_story_clusters_ordered_by_importance_descending(store):
-    _insert_article(store, "hash1", "Low Priority", "Source A", "2024-01-01T12:00:00", 3)
-    _insert_article(store, "hash2", "High Priority", "Source B", "2024-01-02T12:00:00", 9)
-    _insert_article(store, "hash3", "Medium Priority", "Source C", "2024-01-03T12:00:00", 6)
+def test_get_story_clusters_ordered_by_date_then_importance(store):
+    _insert_article(store, "hash1", "Old Low", "Source A", "2024-01-01T12:00:00", 3)
+    _insert_article(store, "hash2", "Mid High", "Source B", "2024-01-02T12:00:00", 9)
+    _insert_article(store, "hash3", "New Medium", "Source C", "2024-01-03T12:00:00", 6)
+
+    clusters = store.get_story_clusters()
+    titles = [c["title"] for c in clusters]
+    # Newest date first regardless of importance score
+    assert titles == ["New Medium", "Mid High", "Old Low"]
+
+
+def test_get_story_clusters_same_date_ordered_by_importance(store):
+    _insert_article(store, "hash1", "Low Score", "Source A", "2024-01-01T10:00:00", 3)
+    _insert_article(store, "hash2", "High Score", "Source B", "2024-01-01T11:00:00", 9)
+    _insert_article(store, "hash3", "Mid Score", "Source C", "2024-01-01T12:00:00", 6)
 
     clusters = store.get_story_clusters()
     scores = [c["importance_score"] for c in clusters]
     assert scores == sorted(scores, reverse=True)
-    assert scores[0] == 9
 
 
 # ---------------------------------------------------------------------------

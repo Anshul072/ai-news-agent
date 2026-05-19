@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 import feedparser
 import pytest
@@ -105,3 +106,68 @@ def test_multiple_feeds_aggregated():
         ])
 
     assert len(articles) == 4
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: since=None fetches all entries (first run, no limit)
+# ---------------------------------------------------------------------------
+
+def test_since_none_fetches_all_articles():
+    with patch("tools.rss_fetcher.feedparser.parse", return_value=_PARSED_VALID):
+        articles = fetch_articles(["https://fake-feed.example.com"], since=None)
+
+    assert len(articles) == 2
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: articles published after `since` are included
+# ---------------------------------------------------------------------------
+
+def test_since_includes_articles_published_after_cutoff():
+    # Feed has: GPT-5 on Jan 1 12:00, Gemini on Jan 2 09:00
+    # since = Jan 1 18:00 → only Gemini passes
+    since = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+    with patch("tools.rss_fetcher.feedparser.parse", return_value=_PARSED_VALID):
+        articles = fetch_articles(["https://fake-feed.example.com"], since=since)
+
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Gemini Update"
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: articles published at or before `since` are excluded
+# ---------------------------------------------------------------------------
+
+def test_since_excludes_articles_published_before_cutoff():
+    since = datetime(2024, 1, 3, 0, 0, 0, tzinfo=timezone.utc)
+    with patch("tools.rss_fetcher.feedparser.parse", return_value=_PARSED_VALID):
+        articles = fetch_articles(["https://fake-feed.example.com"], since=since)
+
+    assert articles == []
+
+
+# ---------------------------------------------------------------------------
+# Behavior 9: entries with unparseable date are included (safe default)
+# ---------------------------------------------------------------------------
+
+NO_DATE_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>AI News</title>
+    <item>
+      <title>No Date Article</title>
+      <link>https://example.com/no-date</link>
+      <description>Article with no pubDate.</description>
+    </item>
+  </channel>
+</rss>"""
+
+_PARSED_NO_DATE = feedparser.parse(NO_DATE_FEED_XML)
+
+
+def test_entries_without_date_are_included_when_since_set():
+    since = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    with patch("tools.rss_fetcher.feedparser.parse", return_value=_PARSED_NO_DATE):
+        articles = fetch_articles(["https://fake-feed.example.com"], since=since)
+
+    assert len(articles) == 1

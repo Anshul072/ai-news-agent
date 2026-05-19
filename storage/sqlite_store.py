@@ -10,7 +10,7 @@ class SQLiteStore:
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
         return self._conn
 
@@ -280,8 +280,18 @@ class SQLiteStore:
                 "articles": articles,
             })
 
-        clusters.sort(key=lambda c: c["importance_score"] or 0, reverse=True)
+        clusters.sort(
+            key=lambda c: ((c["published_at_max"] or "")[:10], c["importance_score"] or 0),
+            reverse=True,
+        )
         return clusters
+
+    def get_last_fetch_time(self) -> str | None:
+        """Return the most recent fetched_at timestamp across all raw articles, or None."""
+        row = self._get_conn().execute(
+            "SELECT MAX(fetched_at) FROM raw_articles"
+        ).fetchone()
+        return row[0] if row and row[0] else None
 
     def get_recent_enriched_articles(self, days: int = 7) -> list[dict]:
         from datetime import timedelta
