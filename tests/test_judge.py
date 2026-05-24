@@ -211,7 +211,7 @@ def test_rate_limiting_sleep_is_applied():
          patch("eval.judge.time.sleep") as mock_sleep:
         judge("news_parse_agent", NEWS_PARSE_INPUTS, NEWS_PARSE_OUTPUT)
 
-    mock_sleep.assert_called_once_with(4)
+    mock_sleep.assert_called_once_with(12)
 
 
 # ---------------------------------------------------------------------------

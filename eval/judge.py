@@ -7,8 +7,9 @@ from google import genai
 
 load_dotenv()
 
-_MODEL = "gemini-2.0-flash"
-_RATE_LIMIT_SLEEP = 4  # seconds — keeps throughput at or below 15 RPM free tier
+_MODEL = "gemini-3.5-flash"
+_FALLBACK_MODEL = "gemini-2.5-flash"
+_RATE_LIMIT_SLEEP = 12  # seconds — keeps throughput at or below 5 RPM free tier
 
 _client = None  # lazily initialised on first judge() call
 
@@ -144,8 +145,9 @@ def _parse_response(text: str, agent_name: str) -> dict:
 def judge(agent_name: str, inputs: dict, output: dict) -> dict:
     """Score agent output against a named rubric using Gemini Flash as judge.
 
-    All dimensions for one article are scored in a single API call. A 4-second
-    sleep is applied before each call to stay within the 15 RPM free-tier limit.
+    All dimensions for one article are scored in a single API call. A 12-second
+    sleep is applied before each call to stay within the 5 RPM free-tier limit.
+    If the primary model fails, retries once with the fallback model.
 
     Returns a dict mapping each dimension name to {"score": int, "reasoning": str}.
     Malformed API responses are handled gracefully — the function never raises.
@@ -157,14 +159,15 @@ def judge(agent_name: str, inputs: dict, output: dict) -> dict:
 
     prompt = _build_prompt(agent_name, inputs, output)
 
-    try:
-        response = _get_client().models.generate_content(model=_MODEL, contents=prompt)
-        text = response.text
-    except Exception as exc:
-        dims = DIMENSIONS[agent_name]
-        return {
-            dim: {"score": 1, "reasoning": f"Judge API call failed: {exc}"}
-            for dim in dims
-        }
+    for model in (_MODEL, _FALLBACK_MODEL):
+        try:
+            response = _get_client().models.generate_content(model=model, contents=prompt)
+            return _parse_response(response.text, agent_name)
+        except Exception as exc:
+            last_exc = exc
 
-    return _parse_response(text, agent_name)
+    dims = DIMENSIONS[agent_name]
+    return {
+        dim: {"score": 1, "reasoning": f"Judge API call failed: {last_exc}"}
+        for dim in dims
+    }
