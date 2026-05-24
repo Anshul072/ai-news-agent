@@ -1,5 +1,3 @@
-import importlib
-import os
 import sys
 from unittest.mock import patch
 import pytest
@@ -7,7 +5,10 @@ import pytest
 
 def _reload_config(monkeypatch, env: dict):
     """Load config with a clean env containing only the supplied vars."""
-    for key in ["GROQ_API_KEY", "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USER_AGENT"]:
+    for key in [
+        "GROQ_API_KEY", "RSS_FEEDS", "NEWS_SCHEDULE", "SENTIMENT_SCHEDULE",
+        "CLUSTERING_THRESHOLD", "SENTIMENT_WINDOW_DAYS", "ARTICLE_FILTER_THRESHOLD",
+    ]:
         monkeypatch.delenv(key, raising=False)
     for key, val in env.items():
         monkeypatch.setenv(key, val)
@@ -19,28 +20,16 @@ def _reload_config(monkeypatch, env: dict):
     return config
 
 
-FULL_ENV = {
-    "GROQ_API_KEY": "gr-key",
-    "REDDIT_CLIENT_ID": "r-id",
-    "REDDIT_CLIENT_SECRET": "r-secret",
-    "REDDIT_USER_AGENT": "r-agent",
-}
+FULL_ENV = {"GROQ_API_KEY": "gr-key"}
 
 
 # ---------------------------------------------------------------------------
-# Behavior 1: missing GROQ_API_KEY raises; Reddit keys are optional
+# Behavior 1: missing GROQ_API_KEY raises
 # ---------------------------------------------------------------------------
 
 def test_missing_groq_key_raises(monkeypatch):
-    env = {k: v for k, v in FULL_ENV.items() if k != "GROQ_API_KEY"}
     with pytest.raises(EnvironmentError, match="GROQ_API_KEY"):
-        _reload_config(monkeypatch, env)
-
-
-def test_missing_reddit_keys_does_not_raise(monkeypatch):
-    cfg = _reload_config(monkeypatch, {"GROQ_API_KEY": "gr-key"})
-    assert cfg.REDDIT_CLIENT_ID == ""
-    assert cfg.REDDIT_CLIENT_SECRET == ""
+        _reload_config(monkeypatch, {})
 
 
 # ---------------------------------------------------------------------------
@@ -50,9 +39,6 @@ def test_missing_reddit_keys_does_not_raise(monkeypatch):
 def test_api_keys_loaded(monkeypatch):
     cfg = _reload_config(monkeypatch, FULL_ENV)
     assert cfg.GROQ_API_KEY == "gr-key"
-    assert cfg.REDDIT_CLIENT_ID == "r-id"
-    assert cfg.REDDIT_CLIENT_SECRET == "r-secret"
-    assert cfg.REDDIT_USER_AGENT == "r-agent"
 
 
 # ---------------------------------------------------------------------------
@@ -62,8 +48,7 @@ def test_api_keys_loaded(monkeypatch):
 def test_defaults(monkeypatch):
     cfg = _reload_config(monkeypatch, FULL_ENV)
     assert isinstance(cfg.RSS_FEEDS, list) and len(cfg.RSS_FEEDS) > 0
-    assert isinstance(cfg.SUBREDDITS, list) and len(cfg.SUBREDDITS) > 0
-    assert cfg.CLUSTERING_THRESHOLD == 0.85
+    assert cfg.CLUSTERING_THRESHOLD == 0.75
     assert cfg.SENTIMENT_WINDOW_DAYS == 7
 
 

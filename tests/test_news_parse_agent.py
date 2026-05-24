@@ -19,7 +19,9 @@ RAW_ARTICLE = {
     "title": "GPT-5 Released",
     "content": (
         "OpenAI announces GPT-5 with major improvements in reasoning and multi-step "
-        "problem solving. The model scores state-of-the-art on several benchmarks."
+        "problem solving. The model scores state-of-the-art on several benchmarks including "
+        "MMLU, HumanEval, and MATH. Researchers note a significant jump in chain-of-thought "
+        "reasoning quality and a reduction in hallucination rate compared to GPT-4."
     ),
     "source_name": "AI News",
     "published_at": "2024-01-01T12:00:00",
