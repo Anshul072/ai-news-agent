@@ -14,13 +14,13 @@ _MODEL = "llama-3.3-70b-versatile"
 _PROMPT_TEMPLATE = """You are an AI news analyst. Given the article below, extract structured information and return ONLY valid JSON with these exact keys:
 
 - summary: 2-3 sentence plain English summary
-- whats_new: the specific advancement or claim
+- whats_new: the specific new finding, release, or announcement — must not restate the summary; identify the concrete detail (version number, date, metric, named feature) that makes this article newsworthy. If nothing genuinely new is reported, write "No novel claim identified."
 - key_concepts: list of 3-5 concept names (strings)
 - concept_explanations: object mapping each concept name to a brief explanation with analogies
 - who_made_it: organization or researchers behind the work
-- use_cases: list of practical applications (strings)
-- importance_score: integer 1-10
-- importance_reasoning: justification for the score
+- use_cases: list of practical applications explicitly mentioned or directly implied by this article — grounded in what the article actually describes, not generic AI capabilities. If the article does not mention any use cases, return an empty list.
+- importance_score: integer 1-10 using these anchors: opinion piece, legal dispute, or newsletter roundup = 1-4; notable product news or significant research finding = 5-7; major first-of-kind release or breakthrough result = 8-10
+- importance_reasoning: justification for the score citing specific evidence from the article
 
 Article title: {title}
 Article content: {content}
@@ -28,7 +28,7 @@ Article content: {content}
 Return ONLY the JSON object, no markdown fences."""
 
 
-_MIN_CONTENT_LENGTH = 80
+_MIN_CONTENT_LENGTH = 200
 
 # Expected type and default for each required output field.
 _REQUIRED_FIELDS: dict[str, tuple] = {
