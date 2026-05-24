@@ -4,18 +4,18 @@ from datetime import datetime, timezone
 from groq import Groq
 
 import config
-from tools.reddit_fetcher import fetch_reddit_threads
+from tools.hn_fetcher import fetch_hn_threads
 
 _client = Groq(api_key=config.GROQ_API_KEY)
 _MODEL = "llama-3.3-70b-versatile"
 
-_KEYWORDS_PROMPT = """Given this article title, extract 3-5 concise search keywords suitable for Reddit search.
+_KEYWORDS_PROMPT = """Given this article title, extract 3-5 concise search keywords suitable for Hacker News search.
 Return ONLY a JSON array of strings, no markdown fences.
 
 Title: {title}"""
 
-_SENTIMENT_PROMPT = """You are analyzing Reddit community sentiment about an AI news article.
-Given the Reddit threads below, produce a sentiment analysis.
+_SENTIMENT_PROMPT = """You are analyzing Hacker News community sentiment about an AI news article.
+Given the Hacker News threads below, produce a sentiment analysis.
 Return ONLY valid JSON with these exact keys:
 
 - sentiment_label: "Positive" | "Negative" | "Mixed" | "Neutral"
@@ -24,9 +24,9 @@ Return ONLY valid JSON with these exact keys:
 - top_concerns: list of up to 3 strings
 - top_use_cases: list of up to 3 strings (community-imagined use cases)
 - notable_quotes: list of 2-3 verbatim comment excerpts
-- subreddit_breakdown: object mapping subreddit name to a one-sentence sentiment summary
+- subreddit_breakdown: object mapping source name to a one-sentence sentiment summary
 
-Reddit threads:
+Hacker News threads:
 {threads}"""
 
 _NEUTRAL_SENTINEL = {
@@ -78,7 +78,7 @@ def run_sentiment(article_id: int, sqlite_store) -> dict:
     )
 
     keywords = _extract_keywords(article["title"])
-    threads = fetch_reddit_threads(keywords)
+    threads = fetch_hn_threads(keywords)
 
     if not threads:
         sentiment = dict(_NEUTRAL_SENTINEL)

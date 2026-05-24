@@ -19,7 +19,7 @@ RAW_ARTICLE = {
 
 MOCK_THREADS = [
     {
-        "subreddit": "artificial",
+        "source": "Hacker News",
         "title": "GPT-5 is incredible",
         "score": 500,
         "num_comments": 200,
@@ -70,7 +70,7 @@ def test_run_sentiment_writes_all_fields(store, article_id):
 
     with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
-         patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
+         patch("agents.sentiment_agent.fetch_hn_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
 
     sentiment = store.get_sentiment(article_id)
@@ -94,7 +94,7 @@ def test_run_sentiment_no_threads_produces_neutral_record(store, article_id):
 
     with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
-         patch("agents.sentiment_agent.fetch_reddit_threads", return_value=[]):
+         patch("agents.sentiment_agent.fetch_hn_threads", return_value=[]):
         run_sentiment(article_id, store)
 
     sentiment = store.get_sentiment(article_id)
@@ -115,7 +115,7 @@ def test_run_sentiment_updates_last_scanned_at(store, article_id):
 
     with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
-         patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
+         patch("agents.sentiment_agent.fetch_hn_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
 
     sentiment = store.get_sentiment(article_id)
@@ -136,7 +136,7 @@ def test_run_sentiment_json_fields_deserialize_correctly(store, article_id):
 
     with patch("agents.sentiment_agent._client.chat.completions.create",
                side_effect=side_effect), \
-         patch("agents.sentiment_agent.fetch_reddit_threads", return_value=MOCK_THREADS):
+         patch("agents.sentiment_agent.fetch_hn_threads", return_value=MOCK_THREADS):
         run_sentiment(article_id, store)
 
     sentiment = store.get_sentiment(article_id)

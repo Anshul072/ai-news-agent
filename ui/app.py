@@ -56,6 +56,51 @@ def _format_date(date_str: str | None) -> str:
         return date_str[:10]
 
 
+def _merge_cluster(articles: list[dict]) -> dict:
+    primary = articles[0]  # already sorted by importance_score DESC
+
+    seen_uc: set[str] = set()
+    use_cases: list[str] = []
+    for a in articles:
+        for uc in (a.get("use_cases") or []):
+            key = uc.lower().strip()
+            if key not in seen_uc:
+                use_cases.append(uc)
+                seen_uc.add(key)
+
+    seen_c: set[str] = set()
+    concepts: list[str] = []
+    explanations: dict[str, str] = {}
+    for a in articles:
+        for c in (a.get("key_concepts") or []):
+            key = c.lower().strip()
+            if key not in seen_c:
+                concepts.append(c)
+                seen_c.add(key)
+            if c not in explanations:
+                exp = (a.get("concept_explanations") or {}).get(c, "")
+                if exp:
+                    explanations[c] = exp
+
+    primary_summary = (primary.get("summary") or "").strip()
+    different_angles = [
+        {"source": a.get("source_name", ""), "summary": (a.get("summary") or "").strip()}
+        for a in articles[1:]
+        if (a.get("summary") or "").strip() and (a.get("summary") or "").strip() != primary_summary
+    ]
+
+    sentiment_article = max(articles, key=lambda a: a.get("thread_count") or 0)
+
+    return {
+        "primary": primary,
+        "use_cases": use_cases,
+        "concepts": concepts,
+        "explanations": explanations,
+        "different_angles": different_angles,
+        "sentiment_article": sentiment_article,
+    }
+
+
 def render_feed(sqlite_store: SQLiteStore) -> None:
     st.header("AI News Feed")
     clusters = sqlite_store.get_story_clusters()
@@ -82,39 +127,45 @@ def render_feed(sqlite_store: SQLiteStore) -> None:
                     st.caption(f"Sources: {sources}")
                     st.caption(f"Published: {date_range}")
 
-                for article in cluster["articles"]:
-                    st.divider()
-                    st.subheader(article.get("title", ""))
-                    st.caption(f"{article.get('source_name', '')} · {(article.get('published_at') or '')[:10]}")
+                merged = _merge_cluster(cluster["articles"])
+                primary = merged["primary"]
 
-                    if article.get("summary"):
-                        st.markdown(f"**Summary:** {article['summary']}")
-                    if article.get("whats_new"):
-                        st.markdown(f"**What's new:** {article['whats_new']}")
-                    if article.get("who_made_it"):
-                        st.markdown(f"**Who made it:** {article['who_made_it']}")
-                    if article.get("use_cases"):
-                        st.markdown("**Use cases:**")
-                        for uc in article["use_cases"]:
-                            st.markdown(f"- {uc}")
+                st.divider()
+                if primary.get("summary"):
+                    st.markdown(f"**Summary:** {primary['summary']}")
+                if primary.get("whats_new"):
+                    st.markdown(f"**What's new:** {primary['whats_new']}")
+                if primary.get("who_made_it"):
+                    st.markdown(f"**Who made it:** {primary['who_made_it']}")
 
-                    concepts = article.get("key_concepts", [])
-                    explanations = article.get("concept_explanations", {})
-                    if concepts:
-                        st.markdown("**Key concepts:**")
-                        for concept in concepts:
-                            explanation = explanations.get(concept, "")
-                            st.markdown(f"- **{concept}**: {explanation}" if explanation else f"- {concept}")
+                if merged["use_cases"]:
+                    st.markdown("**Use cases:**")
+                    for uc in merged["use_cases"]:
+                        st.markdown(f"- {uc}")
 
-                    if article.get("importance_reasoning"):
-                        st.markdown(f"**Importance:** {article['importance_score']}/10 — {article['importance_reasoning']}")
+                if merged["concepts"]:
+                    st.markdown("**Key concepts:**")
+                    for c in merged["concepts"]:
+                        exp = merged["explanations"].get(c, "")
+                        st.markdown(f"- **{c}**: {exp}" if exp else f"- {c}")
 
-                    _render_sentiment_section(article)
+                if primary.get("importance_reasoning"):
+                    st.markdown(f"**Importance:** {primary['importance_score']}/10 — {primary['importance_reasoning']}")
+
+                if merged["different_angles"]:
+                    st.markdown("**Different perspectives:**")
+                    for angle in merged["different_angles"]:
+                        st.markdown(f"> **{angle['source']}:** {angle['summary']}")
+
+                _render_sentiment_section(merged["sentiment_article"])
 
 
 def _render_sentiment_section(article: dict) -> None:
     if article.get("sentiment_label") is None:
         st.info("Sentiment: pending")
+        return
+    if article.get("thread_count") == 0:
+        st.info("No Hacker News discussions found for this article.")
         return
 
     st.markdown(
@@ -135,13 +186,13 @@ def _render_sentiment_section(article: dict) -> None:
             st.markdown(f"> {q}")
     breakdown = article.get("subreddit_breakdown") or {}
     if breakdown:
-        st.markdown("**Per-subreddit breakdown:**")
+        st.markdown("**Community breakdown:**")
         for sub, summary in breakdown.items():
             st.markdown(f"- **{sub}**: {summary}")
     thread_count = article.get("thread_count")
     total_comments = article.get("total_comments")
     if thread_count is not None:
-        st.caption(f"Reddit: {thread_count} threads, {total_comments} comments")
+        st.caption(f"Hacker News: {thread_count} threads, {total_comments} comments")
 
 
 def render_chat(sqlite_store: SQLiteStore, chroma_store: ChromaStore) -> None:
