@@ -1,0 +1,38 @@
+{
+  "agent_name": "rag_agent",
+  "inputs": {
+    "query": "What are the most promising practical use cases for AI discussed recently?",
+    "context_chunks": "[Article 4] Salesforce rolls out new Slackbot AI agent as it battles Microsoft and Google in workplace AI (AI | VentureBeat)\nSummary: Salesforce has launched a new version of Slackbot, a workplace AI assistant that can search enterprise data, draft documents, and take action on behalf of employees. The new Slackbot is powered by Anthropic's large language model, Claude, and is available to Business+ and Enterprise+ customers. Salesforce is positioning Slackbot as a 'super agent' that can coordinate with other AI agents across an organization.\n\n[Article 76] All of the updates from Elon Musk and Sam Altman\u2019s battle over OpenAI (AI | The Verge)\nSummary: Elon Musk and Sam Altman are involved in a high-stakes trial that could impact the future of OpenAI and its product ChatGPT. The trial centers around Musk's accusations that OpenAI has shifted its focus from benefiting humanity to prioritizing profits. The outcome of the trial could significantly alter the direction of OpenAI.\n\n[Article 2] Claude Code costs up to $200 a month. Goose does the same thing for free. (AI | VentureBeat)\nSummary: A new AI coding tool called Goose has been released, offering a free alternative to Anthropic's Claude Code, which can cost up to $200 per month. Goose can run entirely on a user's local machine, providing complete control over the AI-powered workflow and eliminating subscription fees, usage caps, and rate limits. The tool has gained popularity, with over 26,100 stars on GitHub and 362 contributors. Goose operates as a command-line tool or desktop application, performing complex development tasks such as building entire projects, writing and executing code, and debugging failures.\n\n[Article 33] The PR you would have opened yourself (Hugging Face - Blog)\nSummary: The article discusses a new concept, but the provided content is empty, so a summary cannot be generated. However, the title suggests a potential automated system. The article is missing, so the information is limited. The title implies a system that can automate personal tasks.\n\n[Article 71] The Download: Musk v. Altman week 3, and Trump\u2019s tech trading (MIT Technology Review)\nSummary: The Musk v. Altman trial is ongoing, with both sides trading blows over credibility. The jury will soon decide the outcome. The trial is a significant event in the tech world, with implications for the industry."
+  },
+  "output": {
+    "answer": "The most promising practical use cases for AI discussed recently include a workplace AI assistant that can search enterprise data, draft documents, and take action on behalf of employees, as well as AI coding tools that can build entire projects, write and execute code, and debug failures for free, providing an alternative to paid services.",
+    "citations": [
+      {
+        "article_id": 4,
+        "title": "Salesforce rolls out new Slackbot AI agent as it battles Microsoft and Google in workplace AI",
+        "source_name": "AI | VentureBeat",
+        "url": "https://venturebeat.com/technology/salesforce-rolls-out-new-slackbot-ai-agent-as-it-battles-microsoft-and"
+      },
+      {
+        "article_id": 2,
+        "title": "Claude Code costs up to $200 a month. Goose does the same thing for free.",
+        "source_name": "AI | VentureBeat",
+        "url": "https://venturebeat.com/infrastructure/claude-code-costs-up-to-usd200-a-month-goose-does-the-same-thing-for-free"
+      }
+    ]
+  },
+  "golden_scores": {
+    "answer_relevance": {
+      "score": 5,
+      "reasoning": "The query asks for the most promising practical use cases for AI discussed recently. The answer directly identifies two concrete use cases \u00e2\u20ac\u201d a workplace AI assistant for enterprise tasks and AI coding tools for building/debugging software \u00e2\u20ac\u201d both of which are practical applications. It stays on topic and ignores the irrelevant trial-related articles."
+    },
+    "faithfulness": {
+      "score": 5,
+      "reasoning": "Every claim is grounded in the retrieved context. The workplace-assistant capabilities (search enterprise data, draft documents, take action on behalf of employees) come verbatim from Article 4's summary, and the coding-tool capabilities (build entire projects, write and execute code, debug failures, free alternative to paid services) come directly from Article 2's summary. No external facts are introduced."
+    },
+    "citation_accuracy": {
+      "score": 5,
+      "reasoning": "The two cited articles (4 and 2) are exactly the chunks that support the answer's two claims. The agent correctly omitted the irrelevant chunks (Articles 76, 71 on the Musk v. Altman trial, and Article 33 which has no usable content), so the citations precisely match the supporting sources."
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "agent_name": "news_parse_agent",
+  "article_id": 33,
+  "story_group_id": 25,
+  "importance_score": 6,
+  "inputs": {
+    "article_title": "The PR you would have opened yourself",
+    "article_content": ""
+  },
+  "output": {
+    "summary": "The article discusses a new concept, but the provided content is empty, so a summary cannot be generated. However, the title suggests a potential automated system. The article is missing, so the information is limited. The title implies a system that can automate personal tasks.",
+    "whats_new": "The title implies a potential automated personal task system, but the content is not available to confirm the specifics.",
+    "key_concepts": [
+      "Automation",
+      "AI",
+      "Personal Tasks"
+    ],
+    "use_cases": [
+      "Automating household chores",
+      "Scheduling appointments",
+      "Managing email"
+    ],
+    "importance_score": 6,
+    "importance_reasoning": "The potential for automation of personal tasks could greatly impact daily life, but without the actual article content, the significance is speculative and therefore scored moderately."
+  },
+  "golden_scores": {
+    "summary_faithfulness": {
+      "score": 2,
+      "reasoning": "The article content is entirely empty, so there is no sentence to cite. The summary correctly notes 'the provided content is empty,' but then hallucinates beyond the evidence with 'The title implies a system that can automate personal tasks' \u00e2\u20ac\u201d an unsupported inference from a title ('The PR you would have opened yourself') that actually suggests automated code/pull-request generation, not personal-task automation."
+    },
+    "importance_score_calibration": {
+      "score": 1,
+      "reasoning": "An article with no content cannot be assessed for importance, yet the agent assigned a 6/10. The importance_reasoning even admits 'without the actual article content, the significance is speculative' \u00e2\u20ac\u201d which should yield a minimal score (1-2), not a moderate one. Scoring a non-existent article above the midpoint is severe over-calibration."
+    },
+    "key_concepts_relevance": {
+      "score": 1,
+      "reasoning": "The concepts 'Automation', 'AI', and 'Personal Tasks' are invented from the title alone; none can be verified as central since the article body is empty. 'Personal Tasks' also misreads the title, which points toward automated PR/code generation rather than personal-task automation."
+    },
+    "whats_new_specificity": {
+      "score": 1,
+      "reasoning": "whats_new ('The title implies a potential automated personal task system, but the content is not available to confirm the specifics') captures no actual novelty \u00e2\u20ac\u201d it restates the summary's speculation and explicitly concedes the specifics are unconfirmed."
+    },
+    "use_cases_plausibility": {
+      "score": 1,
+      "reasoning": "The use_cases ('Automating household chores', 'Scheduling appointments', 'Managing email') are generic AI-assistant boilerplate with no grounding in the (empty) article, and they contradict the title's implication of automated pull-request/code generation."
+    }
+  }
+}

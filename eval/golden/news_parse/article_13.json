@@ -1,0 +1,50 @@
+{
+  "agent_name": "news_parse_agent",
+  "article_id": 13,
+  "story_group_id": 12,
+  "importance_score": 8,
+  "inputs": {
+    "article_title": "Establishing AI and data sovereignty in the age of autonomous systems",
+    "article_content": "When generative AI first moved from research labs into real-world business applications, enterprises made a tacit bargain: \u201cCapability now, control later.\u201d Feed your proprietary data into third-party AI models, and you will get powerful results. But your data passes through systems you do not own, under governance you do not set. The protections you rely&#8230;"
+  },
+  "output": {
+    "summary": "Enterprises have been using third-party AI models for business applications, but this comes with a loss of control over their proprietary data. As AI and autonomous systems become more prevalent, the need for data sovereignty is growing. This means having control over the systems and governance that handle an organization's data.",
+    "whats_new": "The need for AI and data sovereignty in the age of autonomous systems",
+    "key_concepts": [
+      "Data Sovereignty",
+      "Autonomous Systems",
+      "Generative AI",
+      "AI Governance"
+    ],
+    "use_cases": [
+      "Business applications",
+      "Healthcare",
+      "Finance",
+      "Government"
+    ],
+    "importance_score": 8,
+    "importance_reasoning": "The importance of AI and data sovereignty is high because it directly affects the security and control of an organization's data, which can have significant consequences if compromised or misused."
+  },
+  "golden_scores": {
+    "summary_faithfulness": {
+      "score": 5,
+      "reasoning": "The summary accurately tracks the available article text, which states 'Feed your proprietary data into third-party AI models, and you will get powerful results. But your data passes through systems you do not own, under governance you do not set.' \u00e2\u20ac\u201d the summary's claim about loss of control over proprietary data and governance is directly supported, with no hallucinated facts."
+    },
+    "importance_score_calibration": {
+      "score": 2,
+      "reasoning": "An importance_score of 8 is miscalibrated. This is an opinion/think-piece framing a governance concern ('Capability now, control later'), not a breakthrough, product launch, or research result. A thought-leadership article on a general trend warrants a low-to-mid score (3-4), not 8 which should be reserved for major breakthroughs."
+    },
+    "key_concepts_relevance": {
+      "score": 5,
+      "reasoning": "All four concepts \u00e2\u20ac\u201d Data Sovereignty, Autonomous Systems, Generative AI, AI Governance \u00e2\u20ac\u201d are explicitly present and central: the title names sovereignty and autonomous systems, while the body opens with generative AI moving into business and discusses governance enterprises 'do not set.'"
+    },
+    "whats_new_specificity": {
+      "score": 2,
+      "reasoning": "The whats_new value 'The need for AI and data sovereignty in the age of autonomous systems' is a near-verbatim restatement of the article title and summary thesis. It captures no specific novel claim, finding, or development \u00e2\u20ac\u201d it merely echoes the topic."
+    },
+    "use_cases_plausibility": {
+      "score": 2,
+      "reasoning": "Only 'Business applications' is grounded in the text ('business applications'). 'Healthcare', 'Finance', and 'Government' are generic AI boilerplate domains that do not appear in the provided article content and were not mentioned in connection with the sovereignty argument."
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "agent_name": "rag_agent",
+  "inputs": {
+    "query": "Which AI companies or labs have made major announcements recently?",
+    "context_chunks": "[Article 3] Listen Labs raises $69M after viral billboard hiring stunt to scale AI customer interviews (AI | VentureBeat)\nSummary: Listen Labs, a startup that uses AI to conduct customer interviews, has raised $69 million in Series B funding. The company's platform replaces traditional market research methods, providing actionable insights in hours instead of weeks. Listen Labs has grown rapidly, conducting over one million AI-powered interviews and achieving an annualized revenue of eight figures.\n\n[Article 71] The Download: Musk v. Altman week 3, and Trump\u2019s tech trading (MIT Technology Review)\nSummary: The Musk v. Altman trial is ongoing, with both sides trading blows over credibility. The jury will soon decide the outcome. The trial is a significant event in the tech world, with implications for the industry.\n\n[Article 40] Chatbots at the drive-thru are just the beginning (AI | The Verge)\nSummary: McDonald's began using chatbots at their drive-thru in 2021, marking the start of AI integration in the fast food industry. This technology is expected to revolutionize the way customers interact with restaurants. The use of chatbots is just the beginning of AI's impact on daily life.\n\n[Article 2] Claude Code costs up to $200 a month. Goose does the same thing for free. (AI | VentureBeat)\nSummary: A new AI coding tool called Goose has been released, offering a free alternative to Anthropic's Claude Code, which can cost up to $200 per month. Goose can run entirely on a user's local machine, providing complete control over the AI-powered workflow and eliminating subscription fees, usage caps, and rate limits. The tool has gained popularity, with over 26,100 stars on GitHub and 362 contributors. Goose operates as a command-line tool or desktop application, performing complex development tasks such as building entire projects, writing and executing code, and debugging failures."
+  },
+  "output": {
+    "answer": "Listen Labs, a startup that uses AI to conduct customer interviews, has raised $69 million in Series B funding. Additionally, a new AI coding tool called Goose has been released, offering a free alternative to Anthropic's Claude Code.",
+    "citations": [
+      {
+        "article_id": 3,
+        "title": "Listen Labs raises $69M after viral billboard hiring stunt to scale AI customer interviews",
+        "source_name": "AI | VentureBeat",
+        "url": "https://venturebeat.com/technology/listen-labs-raises-usd69m-after-viral-billboard-hiring-stunt-to-scale-ai"
+      },
+      {
+        "article_id": 2,
+        "title": "Claude Code costs up to $200 a month. Goose does the same thing for free.",
+        "source_name": "AI | VentureBeat",
+        "url": "https://venturebeat.com/infrastructure/claude-code-costs-up-to-usd200-a-month-goose-does-the-same-thing-for-free"
+      }
+    ]
+  },
+  "golden_scores": {
+    "answer_relevance": {
+      "score": 4,
+      "reasoning": "The query asks broadly which AI companies/labs made major announcements recently. The answer cites two relevant announcements (Listen Labs' $69M Series B raise and the release of the Goose coding tool), which directly address the question. However, it is somewhat narrow \u00e2\u20ac\u201d it omits other potentially relevant items in context (e.g., the Musk v. Altman trial involving OpenAI) and frames Goose's 'release' loosely, so coverage is partial rather than comprehensive."
+    },
+    "faithfulness": {
+      "score": 5,
+      "reasoning": "Both claims are fully grounded in the retrieved chunks. The Listen Labs claim ($69M Series B, AI customer interviews) matches Article 3 verbatim in substance, and the Goose claim (free alternative to Anthropic's Claude Code costing up to $200/month) matches Article 2. No external facts or unsupported details are introduced; the answer stays within the provided context."
+    },
+    "citation_accuracy": {
+      "score": 5,
+      "reasoning": "The two citations (article_id 3 and article_id 2) are precisely the chunks that support the two claims in the answer. Titles and source names align with the retrieved context, and no irrelevant or fabricated articles are cited."
+    }
+  }
+}
