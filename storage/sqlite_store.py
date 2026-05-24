@@ -293,6 +293,22 @@ class SQLiteStore:
         ).fetchone()
         return row[0] if row and row[0] else None
 
+    def get_all_enriched_articles(self) -> list[dict]:
+        rows = self._get_conn().execute(
+            """SELECT r.*, e.*
+               FROM raw_articles r
+               JOIN enriched_articles e ON e.article_id = r.id
+               ORDER BY r.published_at DESC"""
+        ).fetchall()
+        results = []
+        for row in rows:
+            d = dict(row)
+            d["key_concepts"] = json.loads(d["key_concepts"] or "[]")
+            d["concept_explanations"] = json.loads(d["concept_explanations"] or "{}")
+            d["use_cases"] = json.loads(d["use_cases"] or "[]")
+            results.append(d)
+        return results
+
     def get_recent_enriched_articles(self, days: int = 7) -> list[dict]:
         from datetime import timedelta
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

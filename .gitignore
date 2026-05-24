@@ -8,3 +8,4 @@ storage/chroma_db/
 storage/news.db
 .agents/
 .claude/
+eval/results/
