@@ -1,6 +1,7 @@
 import json
 import os
 import random
+from itertools import zip_longest
 
 # PRD stratification targets: 1 low (1-3), 2 medium (4-6), 2 high (7-10)
 _STRATIFY_TARGETS = [
@@ -96,10 +97,17 @@ def sampler(sqlite_store, golden_dir: str, n_golden: int = 5, n_recent: int = 5)
     sentiment_golden = _load_golden_fixtures(golden_dir, "sentiment")
     rag_golden = _load_golden_fixtures(golden_dir, "rag")
 
+    # Interleave across agent types so golden_samples[:n] covers all three agents
+    interleaved: list[dict] = []
+    for group in zip_longest(news_parse_golden, sentiment_golden, rag_golden):
+        for fixture in group:
+            if fixture is not None:
+                interleaved.append(fixture)
+
     all_golden: list[dict] = []
     golden_article_ids: set = set()
 
-    for fixture in news_parse_golden + sentiment_golden + rag_golden:
+    for fixture in interleaved:
         sample = {**fixture, "_source": "golden"}
         all_golden.append(sample)
         if fixture.get("article_id") is not None:
