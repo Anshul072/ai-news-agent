@@ -76,7 +76,11 @@ def build_news_pipeline(sqlite_store, chroma_store):
                     parsed.extend(results)
                     logger.info("Parsed: %s", article.get("title", "untitled")[:80])
                 else:
-                    logger.warning("Parse returned empty for: %s", article.get("title", "?")[:60])
+                    clen = len(article_with_id.get("content", ""))
+                    logger.warning(
+                        "Parse returned empty for: %s (content=%d chars, min=%d)",
+                        article.get("title", "?")[:60], clen, 200,
+                    )
             except Exception as exc:
                 logger.warning("Parse failed for %s: %s", article.get("title", "?")[:60], exc)
                 continue
