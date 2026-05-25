@@ -1,0 +1,142 @@
+[
+  {
+    "title": "OpenAI releases GPT-5 with human-level reasoning on MMLU benchmark",
+    "content": "OpenAI has announced GPT-5, its latest large language model, achieving human-level performance across the MMLU benchmark suite. The model demonstrates significant improvements in multi-step reasoning, code generation, and instruction following compared to GPT-4. GPT-5 will be available via the OpenAI API starting next month, with a free tier for developers.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Major LLM release — core coverage target"
+  },
+  {
+    "title": "DeepMind publishes Gemini Ultra architecture paper with 90.0% on MMLU",
+    "content": "DeepMind researchers have released the technical paper behind Gemini Ultra, detailing the multimodal architecture that achieves 90.0% accuracy on MMLU, surpassing previous best results. The paper covers the mixture-of-experts design, training data curation, and reinforcement learning from human feedback pipeline used to align the model.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "ML research paper with benchmark results — core coverage target"
+  },
+  {
+    "title": "Meta releases LLaMA 3.1 405B as fully open-source weights",
+    "content": "Meta AI has released LLaMA 3.1, including the 405B parameter variant, under a permissive open-source license. The release includes model weights, training code, and a fine-tuning guide. LLaMA 3.1 outperforms GPT-4 on several benchmarks while remaining fully open for commercial and research use.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Open-source LLM model release — core coverage target"
+  },
+  {
+    "title": "PyTorch 2.4 ships with torch.compile improvements and 30% faster training",
+    "content": "The PyTorch team has released version 2.4, featuring significant improvements to torch.compile including better support for dynamic shapes, reduced compilation overhead, and up to 30% faster training on standard transformer workloads. The release also includes native support for FP8 quantization and improved CUDA graph integration.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Major open-source ML library release — matches seed phrase directly"
+  },
+  {
+    "title": "Anthropic publishes Constitutional AI paper on scalable oversight",
+    "content": "Anthropic researchers have published a new paper on Constitutional AI, presenting a method for scalable oversight of large language models using AI feedback. The paper demonstrates that models trained with constitutional principles show reduced harmful outputs while maintaining helpfulness, offering a path toward more reliable alignment techniques.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "AI safety and alignment research — matches seed phrase directly"
+  },
+  {
+    "title": "Stanford researchers achieve state-of-the-art on SQuAD 2.0 with sparse attention",
+    "content": "A Stanford NLP group has published results showing a new sparse attention mechanism that achieves state-of-the-art performance on SQuAD 2.0 question answering while reducing memory usage by 40%. The technique, called Block-Sparse Attention, applies learned sparsity patterns that preserve long-range dependencies without full quadratic attention.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "NLP research breakthrough — matches seed phrase directly"
+  },
+  {
+    "title": "Google releases Gemini Vision with real-time video understanding",
+    "content": "Google has released Gemini Vision, a multimodal model capable of real-time video understanding and frame-level question answering. The model processes video at 30fps and can answer questions about temporal sequences, object tracking, and scene transitions. It achieves new state-of-the-art results on ActivityNet and MSVD video QA benchmarks.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Computer vision model release — matches seed phrase directly"
+  },
+  {
+    "title": "LoRA fine-tuning technique adapted for vision-language models with 10x memory reduction",
+    "content": "Researchers have extended Low-Rank Adaptation (LoRA) to vision-language models, achieving comparable performance to full fine-tuning with 10x lower memory usage. The technique, named VL-LoRA, applies rank decomposition to both visual encoder and language decoder attention matrices, enabling fine-tuning of 13B parameter models on consumer GPUs.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "LLM fine-tuning technique — matches seed phrase directly"
+  },
+  {
+    "title": "Google MedPaLM 2 achieves expert-level accuracy on USMLE medical exam questions",
+    "content": "Google Research has published results for MedPaLM 2, a medical large language model that achieves expert-level performance on USMLE Step 1 and Step 2 CK exams. The model outperforms licensed physicians on 67.2% of questions and demonstrates strong clinical reasoning across oncology, cardiology, and general practice domains.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Breakthrough AI application with benchmark results — high importance"
+  },
+  {
+    "title": "AWS announces Bedrock expansion with Titan Embeddings v2 and fine-tuning support",
+    "content": "Amazon Web Services has expanded its Bedrock AI platform with Titan Embeddings v2, supporting 1536-dimension vectors and multilingual embedding for 100 languages. The update also adds native fine-tuning support for Titan Text models using customer data stored in S3, with automatic hyperparameter tuning and spot instance training jobs.",
+    "expected_pass": true,
+    "category": "ai_research",
+    "rationale": "Cloud AI platform update with embedding and fine-tuning features — relevant"
+  },
+  {
+    "title": "Manchester City wins Premier League title with record 98 points",
+    "content": "Manchester City have clinched the Premier League title after a 3-1 victory over West Ham at the Etihad Stadium, finishing the season with a record 98 points. Erling Haaland scored twice to seal the championship, his 38th league goal of the campaign. Manager Pep Guardiola celebrated his eighth league title.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Sports news — unrelated to AI or technology"
+  },
+  {
+    "title": "Classic beef bourguignon recipe with slow cooker adaptation",
+    "content": "This traditional French beef bourguignon takes under 30 minutes to prepare and can be adapted for a slow cooker for a richer flavor. Start by browning 2 lbs of chuck beef in batches with olive oil, then deglaze with a full bottle of Burgundy red wine. Add pearl onions, mushrooms, and thyme. Cook on low for 8 hours.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Cooking content — completely unrelated to AI"
+  },
+  {
+    "title": "Severe weather warning issued for Southeast coast ahead of Hurricane season",
+    "content": "The National Weather Service has issued severe weather warnings for Georgia, South Carolina, and North Carolina ahead of the official Atlantic hurricane season start. Residents are advised to prepare emergency kits, review evacuation routes, and secure outdoor furniture. The forecast models show above-average storm activity through October.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Weather news — unrelated to AI or technology"
+  },
+  {
+    "title": "Federal Reserve raises interest rates by 25 basis points amid inflation concerns",
+    "content": "The Federal Reserve raised its benchmark interest rate by 25 basis points on Wednesday, bringing it to a 22-year high of 5.5%, as policymakers continue their battle against persistent inflation. Fed Chair Jerome Powell signaled additional hikes remain on the table if inflation does not show further signs of cooling.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Financial/economic news — unrelated to AI"
+  },
+  {
+    "title": "Biden signs $1.2 trillion infrastructure bill into law",
+    "content": "President Biden signed the bipartisan Infrastructure Investment and Jobs Act into law at a White House ceremony, delivering $1.2 trillion to rebuild roads, bridges, broadband, and clean water systems. The bill passed the Senate 69-30 and the House 228-206, drawing support from both parties. Implementation begins immediately with grants to states.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Political/government news — unrelated to AI"
+  },
+  {
+    "title": "Oppenheimer wins Best Picture at the Academy Awards",
+    "content": "Christopher Nolan's Oppenheimer dominated the 96th Academy Awards, taking home seven Oscars including Best Picture, Best Director, and Best Actor for Cillian Murphy. The three-hour biographical thriller, which explores the development of the atomic bomb, became the highest-grossing R-rated film in history with $952 million worldwide.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Entertainment news — unrelated to AI"
+  },
+  {
+    "title": "Best hidden gems in Southeast Asia for budget travelers in 2025",
+    "content": "Beyond the classic tourist trails of Thailand and Bali, Southeast Asia is full of underrated destinations worth visiting. Kampot in Cambodia offers French colonial architecture and riverside relaxation for under $30 per day. Mui Ne in Vietnam provides world-class kitesurfing and sand dunes without the crowds of Da Nang.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Travel content — unrelated to AI"
+  },
+  {
+    "title": "US housing market sees home prices fall 3% as mortgage rates hit 7.5%",
+    "content": "The median US home price fell 3% year-over-year in March as 30-year fixed mortgage rates climbed to 7.5%, the highest since 2000. Existing home sales dropped to a 13-year low of 4.1 million annualized units. Analysts expect prices to stabilize in Q3 as buyer demand adjusts to the higher-rate environment.",
+    "expected_pass": false,
+    "category": "irrelevant",
+    "rationale": "Real estate market news — unrelated to AI"
+  },
+  {
+    "title": "React 19 ships with Server Components stable and new hooks API",
+    "content": "The React team has released React 19 with Server Components now marked stable for production use. The release introduces three new hooks: useOptimistic for optimistic UI updates, useFormStatus for form state management, and useFormState for server action results. The new compiler, React Forget, is included as an opt-in feature to eliminate manual memoization.",
+    "expected_pass": false,
+    "category": "general_tech",
+    "rationale": "Frontend framework release — developer tooling but not AI/ML related"
+  },
+  {
+    "title": "PostgreSQL 17 released with incremental backup and logical replication improvements",
+    "content": "The PostgreSQL Global Development Group has released PostgreSQL 17, featuring incremental backup support, improved logical replication performance, and a new MERGE SQL command. The release also introduces faster bulk loading via COPY, extended statistics for query planner improvements, and vacuum parallelism for large table maintenance.",
+    "expected_pass": false,
+    "category": "general_tech",
+    "rationale": "Database software release — developer tooling but not AI/ML related"
+  }
+]
