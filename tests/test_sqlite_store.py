@@ -75,3 +75,59 @@ def test_multiple_articles_stored(store):
     store.insert_raw_article(a2)
     articles = store.get_all_raw_articles()
     assert len(articles) == 2
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: sentiment_history accumulates one row per article per day
+# ---------------------------------------------------------------------------
+
+def _insert_article_and_get_id(store) -> int:
+    store.insert_raw_article(ARTICLE)
+    return store.get_raw_article_by_url_hash(ARTICLE["url_hash"])["id"]
+
+
+SENTIMENT = {
+    "sentiment_label": "Positive",
+    "sentiment_score": 0.75,
+    "excitement_level": "Hyped",
+    "top_concerns": [],
+    "top_use_cases": [],
+    "notable_quotes": [],
+    "subreddit_breakdown": {},
+    "thread_count": 3,
+    "total_comments": 42,
+    "last_scanned_at": "2024-06-01T08:00:00+00:00",
+}
+
+
+def test_sentiment_history_created_on_upsert(store):
+    article_id = _insert_article_and_get_id(store)
+    store.upsert_sentiment(article_id, SENTIMENT)
+    history = store.get_all_sentiment_history()
+    assert article_id in history
+    rows = history[article_id]
+    assert len(rows) == 1
+    assert rows[0]["scan_date"] == "2024-06-01"
+    assert rows[0]["sentiment_label"] == "Positive"
+    assert rows[0]["sentiment_score"] == pytest.approx(0.75)
+    assert rows[0]["thread_count"] == 3
+
+
+def test_sentiment_history_deduplicates_same_day(store):
+    article_id = _insert_article_and_get_id(store)
+    store.upsert_sentiment(article_id, SENTIMENT)
+    later_same_day = {**SENTIMENT, "sentiment_score": 0.5, "last_scanned_at": "2024-06-01T20:00:00+00:00"}
+    store.upsert_sentiment(article_id, later_same_day)
+    rows = store.get_all_sentiment_history()[article_id]
+    assert len(rows) == 1
+    assert rows[0]["sentiment_score"] == pytest.approx(0.5)
+
+
+def test_sentiment_history_accumulates_across_days(store):
+    article_id = _insert_article_and_get_id(store)
+    for day, score in [("2024-06-01", 0.4), ("2024-06-02", 0.6), ("2024-06-03", 0.8)]:
+        store.upsert_sentiment(article_id, {**SENTIMENT, "sentiment_score": score, "last_scanned_at": f"{day}T08:00:00+00:00"})
+    rows = store.get_all_sentiment_history()[article_id]
+    assert len(rows) == 3
+    assert [r["scan_date"] for r in rows] == ["2024-06-01", "2024-06-02", "2024-06-03"]
+    assert rows[2]["sentiment_score"] == pytest.approx(0.8)

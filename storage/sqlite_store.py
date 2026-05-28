@@ -53,6 +53,18 @@ class SQLiteStore:
                 last_scanned_at     TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS sentiment_history (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                article_id       INTEGER NOT NULL REFERENCES raw_articles(id),
+                scan_date        TEXT NOT NULL,
+                sentiment_label  TEXT,
+                sentiment_score  REAL,
+                excitement_level TEXT,
+                thread_count     INTEGER,
+                total_comments   INTEGER,
+                UNIQUE(article_id, scan_date)
+            );
+
             CREATE TABLE IF NOT EXISTS enriched_articles (
                 id                   INTEGER PRIMARY KEY AUTOINCREMENT,
                 article_id           INTEGER UNIQUE NOT NULL REFERENCES raw_articles(id),
@@ -212,6 +224,30 @@ class SQLiteStore:
                 sentiment.get("last_scanned_at"),
             ),
         )
+        last_scanned_at = sentiment.get("last_scanned_at") or ""
+        scan_date = last_scanned_at[:10]
+        if scan_date:
+            conn.execute(
+                """INSERT INTO sentiment_history
+                   (article_id, scan_date, sentiment_label, sentiment_score,
+                    excitement_level, thread_count, total_comments)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(article_id, scan_date) DO UPDATE SET
+                    sentiment_label  = excluded.sentiment_label,
+                    sentiment_score  = excluded.sentiment_score,
+                    excitement_level = excluded.excitement_level,
+                    thread_count     = excluded.thread_count,
+                    total_comments   = excluded.total_comments""",
+                (
+                    article_id,
+                    scan_date,
+                    sentiment.get("sentiment_label"),
+                    sentiment.get("sentiment_score"),
+                    sentiment.get("excitement_level"),
+                    sentiment.get("thread_count", 0),
+                    sentiment.get("total_comments", 0),
+                ),
+            )
         conn.commit()
 
     def get_sentiment(self, article_id: int) -> dict | None:
@@ -226,6 +262,19 @@ class SQLiteStore:
         result["notable_quotes"] = json.loads(result["notable_quotes"] or "[]")
         result["subreddit_breakdown"] = json.loads(result["subreddit_breakdown"] or "{}")
         return result
+
+    def get_all_sentiment_history(self) -> dict[int, list[dict]]:
+        from collections import defaultdict
+        rows = self._get_conn().execute(
+            """SELECT article_id, scan_date, sentiment_label, sentiment_score,
+                      excitement_level, thread_count, total_comments
+               FROM sentiment_history
+               ORDER BY article_id, scan_date ASC"""
+        ).fetchall()
+        result: dict[int, list[dict]] = defaultdict(list)
+        for row in rows:
+            result[row["article_id"]].append(dict(row))
+        return dict(result)
 
     def get_story_clusters(self) -> list[dict]:
         """Returns story clusters ordered by max importance_score descending."""

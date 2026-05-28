@@ -104,6 +104,7 @@ def _merge_cluster(articles: list[dict]) -> dict:
 def render_feed(sqlite_store: SQLiteStore) -> None:
     st.header("AI News Feed")
     clusters = sqlite_store.get_story_clusters()
+    sentiment_history = sqlite_store.get_all_sentiment_history()
 
     if not clusters:
         st.info("No stories yet. Use the sidebar to fetch news.")
@@ -157,10 +158,12 @@ def render_feed(sqlite_store: SQLiteStore) -> None:
                     for angle in merged["different_angles"]:
                         st.markdown(f"> **{angle['source']}:** {angle['summary']}")
 
-                _render_sentiment_section(merged["sentiment_article"])
+                article_id = merged["sentiment_article"].get("article_id")
+                history = sentiment_history.get(article_id, [])
+                _render_sentiment_section(merged["sentiment_article"], history)
 
 
-def _render_sentiment_section(article: dict) -> None:
+def _render_sentiment_section(article: dict, history: list[dict]) -> None:
     if article.get("sentiment_label") is None:
         st.info("Sentiment: pending")
         return
@@ -193,6 +196,20 @@ def _render_sentiment_section(article: dict) -> None:
     total_comments = article.get("total_comments")
     if thread_count is not None:
         st.caption(f"Hacker News: {thread_count} threads, {total_comments} comments")
+    if len(history) >= 2:
+        st.markdown("**Sentiment trend:**")
+        scores = [h["sentiment_score"] if h["sentiment_score"] is not None else 0.0
+                  for h in history]
+        st.line_chart({"score": scores}, height=120, y_label="Score")
+        table_rows = [
+            {
+                "Date": h["scan_date"],
+                "Label": h["sentiment_label"] or "—",
+                "Score": f"{h['sentiment_score']:+.2f}" if h["sentiment_score"] is not None else "—",
+            }
+            for h in history
+        ]
+        st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
 
 def render_chat(sqlite_store: SQLiteStore, chroma_store: ChromaStore) -> None:
