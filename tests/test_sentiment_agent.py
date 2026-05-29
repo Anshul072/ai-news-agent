@@ -128,6 +128,18 @@ def test_run_sentiment_updates_last_scanned_at(store, article_id):
 # Behavior 4: subreddit_breakdown and top_use_cases are lists/dicts
 # ---------------------------------------------------------------------------
 
+def test_run_sentiment_passes_url_to_fetcher(store, article_id):
+    side_effect = _make_groq_side_effect('["GPT-5", "OpenAI"]')
+
+    with patch("agents.sentiment_agent._client.chat.completions.create",
+               side_effect=side_effect), \
+         patch("agents.sentiment_agent.fetch_hn_threads", return_value=[]) as mock_fetch:
+        run_sentiment(article_id, store)
+
+    _, kwargs = mock_fetch.call_args
+    assert kwargs.get("article_url") == RAW_ARTICLE["url"]
+
+
 def test_run_sentiment_json_fields_deserialize_correctly(store, article_id):
     side_effect = _make_groq_side_effect(
         '["GPT-5"]',

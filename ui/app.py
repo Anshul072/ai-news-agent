@@ -39,6 +39,12 @@ def get_stores():
     return sqlite, chroma
 
 
+@st.cache_resource
+def _start_model_warmup():
+    from tools.embedder import embed
+    threading.Thread(target=lambda: embed("warmup"), daemon=True).start()
+
+
 def _sentiment_badge(label: str | None, score: float | None) -> str:
     if label is None:
         return "⏳ Pending"
@@ -115,7 +121,15 @@ def render_feed(sqlite_store: SQLiteStore) -> None:
         for cluster in date_clusters:
             title = cluster["title"] or "Untitled Story"
             score = cluster["importance_score"] or 0
-            sources = ", ".join(cluster["source_names"])
+            seen_sources: set[str] = set()
+            source_links: list[str] = []
+            for a in cluster["articles"]:
+                name = a.get("source_name") or ""
+                url = a.get("url") or ""
+                if name and name not in seen_sources:
+                    source_links.append(f"[{name}]({url})" if url else name)
+                    seen_sources.add(name)
+            sources = ", ".join(source_links)
             sentiment = _sentiment_badge(cluster["sentiment_label"], cluster["sentiment_score"])
             date_min = (cluster["published_at_min"] or "")[:10]
             date_max = (cluster["published_at_max"] or "")[:10]
@@ -125,7 +139,7 @@ def render_feed(sqlite_store: SQLiteStore) -> None:
             with st.expander(header):
                 col1, col2 = st.columns([1, 1])
                 with col1:
-                    st.caption(f"Sources: {sources}")
+                    st.markdown(f"Sources: {sources}")
                     st.caption(f"Published: {date_range}")
 
                 merged = _merge_cluster(cluster["articles"])
@@ -194,8 +208,12 @@ def _render_sentiment_section(article: dict, history: list[dict]) -> None:
             st.markdown(f"- **{sub}**: {summary}")
     thread_count = article.get("thread_count")
     total_comments = article.get("total_comments")
+    hn_urls = article.get("hn_thread_urls") or []
     if thread_count is not None:
         st.caption(f"Hacker News: {thread_count} threads, {total_comments} comments")
+    if hn_urls:
+        links = " · ".join(f"[Thread {i + 1}]({url})" for i, url in enumerate(hn_urls))
+        st.markdown(f"HN threads: {links}")
     if len(history) >= 2:
         st.markdown("**Sentiment trend:**")
         scores = [h["sentiment_score"] if h["sentiment_score"] is not None else 0.0
@@ -331,6 +349,7 @@ def _run_sentiment():
 
 def main():
     sqlite_store, chroma_store = get_stores()
+    _start_model_warmup()
     view = render_sidebar()
 
     if view == "Feed":

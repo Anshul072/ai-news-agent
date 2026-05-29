@@ -80,6 +80,11 @@ class SQLiteStore:
             );
         """)
         conn.commit()
+        try:
+            conn.execute("ALTER TABLE article_sentiment ADD COLUMN hn_thread_urls TEXT")
+            conn.commit()
+        except Exception:
+            pass  # column already exists
 
     def url_hash_exists(self, url_hash: str) -> bool:
         row = self._get_conn().execute(
@@ -197,8 +202,8 @@ class SQLiteStore:
             """INSERT INTO article_sentiment
                (article_id, sentiment_label, sentiment_score, excitement_level,
                 top_concerns, top_use_cases, notable_quotes, subreddit_breakdown,
-                thread_count, total_comments, last_scanned_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                thread_count, total_comments, last_scanned_at, hn_thread_urls)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(article_id) DO UPDATE SET
                 sentiment_label     = excluded.sentiment_label,
                 sentiment_score     = excluded.sentiment_score,
@@ -209,7 +214,8 @@ class SQLiteStore:
                 subreddit_breakdown = excluded.subreddit_breakdown,
                 thread_count        = excluded.thread_count,
                 total_comments      = excluded.total_comments,
-                last_scanned_at     = excluded.last_scanned_at""",
+                last_scanned_at     = excluded.last_scanned_at,
+                hn_thread_urls      = excluded.hn_thread_urls""",
             (
                 article_id,
                 sentiment.get("sentiment_label"),
@@ -222,6 +228,7 @@ class SQLiteStore:
                 sentiment.get("thread_count", 0),
                 sentiment.get("total_comments", 0),
                 sentiment.get("last_scanned_at"),
+                json.dumps(sentiment.get("hn_thread_urls", [])),
             ),
         )
         last_scanned_at = sentiment.get("last_scanned_at") or ""
@@ -282,13 +289,13 @@ class SQLiteStore:
         conn = self._get_conn()
         rows = conn.execute(
             """
-            SELECT r.id AS article_id, r.title, r.source_name, r.published_at,
+            SELECT r.id AS article_id, r.url, r.title, r.source_name, r.published_at,
                    e.story_group_id, e.summary, e.whats_new, e.key_concepts,
                    e.concept_explanations, e.who_made_it, e.use_cases,
                    e.importance_score, e.importance_reasoning,
                    s.sentiment_label, s.sentiment_score, s.excitement_level,
                    s.top_concerns, s.top_use_cases, s.notable_quotes,
-                   s.subreddit_breakdown, s.thread_count, s.total_comments
+                   s.subreddit_breakdown, s.thread_count, s.total_comments, s.hn_thread_urls
             FROM raw_articles r
             JOIN enriched_articles e ON e.article_id = r.id
             LEFT JOIN article_sentiment s ON s.article_id = r.id
@@ -307,6 +314,7 @@ class SQLiteStore:
             d["top_use_cases"] = json.loads(d["top_use_cases"] or "[]")
             d["notable_quotes"] = json.loads(d["notable_quotes"] or "[]")
             d["subreddit_breakdown"] = json.loads(d["subreddit_breakdown"] or "{}")
+            d["hn_thread_urls"] = json.loads(d["hn_thread_urls"] or "[]")
             groups[d["story_group_id"]].append(d)
 
         clusters = []

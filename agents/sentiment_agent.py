@@ -78,7 +78,7 @@ def run_sentiment(article_id: int, sqlite_store) -> dict:
     )
 
     keywords = _extract_keywords(article["title"])
-    threads = fetch_hn_threads(keywords)
+    threads = fetch_hn_threads(keywords, article_url=article["url"])
 
     if not threads:
         sentiment = dict(_NEUTRAL_SENTINEL)
@@ -89,6 +89,7 @@ def run_sentiment(article_id: int, sqlite_store) -> dict:
             sentiment = dict(_NEUTRAL_SENTINEL)
         sentiment["thread_count"] = len(threads)
         sentiment["total_comments"] = sum(t.get("num_comments", 0) for t in threads)
+        sentiment["hn_thread_urls"] = [t["url"] for t in threads if t.get("url")]
 
     sentiment["last_scanned_at"] = datetime.now(timezone.utc).isoformat()
     sqlite_store.upsert_sentiment(article_id, sentiment)
