@@ -32,6 +32,7 @@ DIMENSIONS = {
         "label_score_consistency",
         "concern_use_case_groundedness",
         "quote_authenticity",
+        "thread_relevance",
     ],
     "rag_agent": [
         "answer_relevance",
@@ -73,13 +74,17 @@ def _build_prompt(agent_name: str, inputs: dict, output: dict) -> str:
             "Return ONLY valid JSON — no markdown fences:\n\n"
             '{"label_score_consistency": {"score": <int 1-5>, "reasoning": "<string>"},\n'
             ' "concern_use_case_groundedness": {"score": <int 1-5>, "reasoning": "<string>"},\n'
-            ' "quote_authenticity": {"score": <int 1-5>, "reasoning": "<string>"}}\n\n'
+            ' "quote_authenticity": {"score": <int 1-5>, "reasoning": "<string>"},\n'
+            ' "thread_relevance": {"score": <int 1-5>, "reasoning": "<string>"}}\n\n'
             "Rubric:\n"
             "- label_score_consistency: Does the sentiment_label (Positive/Negative/Mixed/Neutral) "
             "align with the numeric sentiment_score?\n"
             "- concern_use_case_groundedness: Are top_concerns and top_use_cases traceable to "
             "the HN thread comments provided?\n"
-            "- quote_authenticity: Do notable_quotes read like real HN comments, not LLM-generated summaries?\n\n"
+            "- quote_authenticity: Do notable_quotes read like real HN comments, not LLM-generated summaries?\n"
+            "- thread_relevance: Are the HN threads topically related to the article title? "
+            "1 = threads clearly about a different topic; 3 = no threads provided (insufficient data); "
+            "5 = threads directly discuss the article.\n\n"
             f"Article title: {inputs.get('article_title', '')}\n"
             f"HN threads:\n{json.dumps(inputs.get('hn_threads', []), indent=2)}\n\n"
             f"Agent output:\n{output_str}"

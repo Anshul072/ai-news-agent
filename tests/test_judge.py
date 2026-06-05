@@ -70,6 +70,10 @@ MOCK_SENTIMENT_RESPONSE = {
         "score": 4,
         "reasoning": "Quotes read as genuine HN-style comments.",
     },
+    "thread_relevance": {
+        "score": 5,
+        "reasoning": "Thread title 'GPT-5 is here' directly matches the article about GPT-5.",
+    },
 }
 
 MOCK_RAG_RESPONSE = {

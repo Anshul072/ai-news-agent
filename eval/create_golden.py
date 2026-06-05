@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from storage.sqlite_store import SQLiteStore
 from storage.chroma_store import ChromaStore
 from tools.embedder import embed
+from tools.hn_fetcher import fetch_hn_threads
 
 _MODEL = "claude-opus-4-7"
 
@@ -129,7 +130,7 @@ def _score_news_parse(article: dict) -> dict:
     ])
 
 
-def _score_sentiment(article: dict, sentiment: dict) -> dict:
+def _score_sentiment(article: dict, sentiment: dict, hn_threads: list[dict]) -> dict:
     output_obj = {
         "sentiment_label": sentiment.get("sentiment_label"),
         "sentiment_score": sentiment.get("sentiment_score"),
@@ -144,16 +145,20 @@ def _score_sentiment(article: dict, sentiment: dict) -> dict:
         "Return ONLY valid JSON — no markdown fences:\n\n"
         '{"label_score_consistency": {"score": <int 1-5>, "reasoning": "<string>"},\n'
         ' "concern_use_case_groundedness": {"score": <int 1-5>, "reasoning": "<string>"},\n'
-        ' "quote_authenticity": {"score": <int 1-5>, "reasoning": "<string>"}}\n\n'
+        ' "quote_authenticity": {"score": <int 1-5>, "reasoning": "<string>"},\n'
+        ' "thread_relevance": {"score": <int 1-5>, "reasoning": "<string>"}}\n\n'
         "Rubric:\n"
         "- label_score_consistency: Does the sentiment_label (Positive/Negative/Mixed/Neutral) "
         "align with the numeric sentiment_score? (-1.0 to 1.0 maps to Negative..Positive)\n"
         "- concern_use_case_groundedness: Are top_concerns and top_use_cases traceable to "
         "the provided HN thread comments? If no HN threads are provided, score 3 (insufficient data).\n"
         "- quote_authenticity: Do notable_quotes read like real HN comments, not LLM-generated summaries? "
-        "Look for informal tone, specific technical references, and varied sentence structure.\n\n"
+        "Look for informal tone, specific technical references, and varied sentence structure.\n"
+        "- thread_relevance: Are the HN threads topically related to the article title? "
+        "1 = threads clearly about a different topic; 3 = no threads provided (insufficient data); "
+        "5 = threads directly discuss the article.\n\n"
         f"Article title: {article.get('title', '')}\n\n"
-        "HN threads: []\n\n"
+        f"HN threads:\n{json.dumps(hn_threads, indent=2)}\n\n"
         f"Agent output:\n{json.dumps(output_obj, indent=2)}"
     )
     text = _call_opus(prompt)
@@ -161,6 +166,7 @@ def _score_sentiment(article: dict, sentiment: dict) -> dict:
         "label_score_consistency",
         "concern_use_case_groundedness",
         "quote_authenticity",
+        "thread_relevance",
     ])
 
 
@@ -317,14 +323,16 @@ def main() -> None:
             print(f"  Skipping article {aid} — no sentiment data")
             continue
         print(f"  Scoring sentiment for article {aid}: {article.get('title', '')[:60]}...")
-        scores = _score_sentiment(article, sentiment)
+        keywords = article.get("key_concepts") or article.get("title", "").split()[:5]
+        hn_threads = fetch_hn_threads(keywords, article_url=article.get("url"))
+        scores = _score_sentiment(article, sentiment, hn_threads)
         fixture = {
             "agent_name": "sentiment_agent",
             "article_id": aid,
             "story_group_id": article.get("story_group_id"),
             "inputs": {
                 "article_title": article.get("title", ""),
-                "hn_threads": [],
+                "hn_threads": hn_threads,
             },
             "output": {
                 "sentiment_label": sentiment.get("sentiment_label"),
