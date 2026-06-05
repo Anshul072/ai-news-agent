@@ -173,3 +173,56 @@ def test_answer_query_includes_history_in_messages(sqlite_store, chroma_store):
     assert messages[1]["content"] == "What is GPT-5?"
     assert messages[2]["content"] == "GPT-5 is OpenAI's latest model."
     assert messages[-1]["content"] == "Tell me more."
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: all enriched fields appear in the constructed context
+# ---------------------------------------------------------------------------
+
+def test_build_context_part_includes_all_enriched_fields():
+    from agents.rag_agent import _build_context_part
+
+    raw = {"title": "GPT-5 Released", "source_name": "AI News"}
+    enriched = {
+        "summary": "GPT-5 is OpenAI's most capable model.",
+        "whats_new": "Major reasoning improvements.",
+        "key_concepts": ["transformer", "RLHF"],
+        "who_made_it": "OpenAI",
+        "use_cases": ["coding", "summarization"],
+        "importance_reasoning": "Major capability jump.",
+    }
+
+    context = _build_context_part(1, raw, enriched)
+
+    assert "Summary: GPT-5 is OpenAI's most capable model." in context
+    assert "What's new: Major reasoning improvements." in context
+    assert "Key concepts: transformer, RLHF" in context
+    assert "Who made it: OpenAI" in context
+    assert "Use cases: coding, summarization" in context
+    assert "Why it matters: Major capability jump." in context
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: empty or missing enriched fields are omitted from context
+# ---------------------------------------------------------------------------
+
+def test_build_context_part_omits_empty_fields():
+    from agents.rag_agent import _build_context_part
+
+    raw = {"title": "GPT-5 Released", "source_name": "AI News"}
+    enriched = {
+        "summary": "GPT-5 is OpenAI's most capable model.",
+        "whats_new": "",
+        "key_concepts": [],
+        "who_made_it": None,
+        # use_cases and importance_reasoning missing entirely
+    }
+
+    context = _build_context_part(1, raw, enriched)
+
+    assert "Summary: GPT-5 is OpenAI's most capable model." in context
+    assert "What's new" not in context
+    assert "Key concepts" not in context
+    assert "Who made it" not in context
+    assert "Use cases" not in context
+    assert "Why it matters" not in context

@@ -15,9 +15,16 @@ _NO_DATA = {
 
 _HISTORY_WINDOW = 10
 
-_SYSTEM_PROMPT = """You are an AI news analyst. Answer the user's question using ONLY the provided articles below.
+_SYSTEM_PROMPT = """You are an AI news analyst. Your job is to answer the user's question by reasoning over the provided articles.
+
+Treat the articles as source material — do NOT restate or paraphrase them. Instead, construct an answer in your own words that:
+- Explains what happened and the sequence of events
+- Identifies who was involved and what they did
+- Explains why it matters and what changed
+- Directly addresses what the user asked
+
 Return ONLY valid JSON with keys:
-- answer: your grounded answer as a string
+- answer: your synthesised answer as a string
 - cited_ids: list of integer article IDs you referenced
 
 Articles:
@@ -33,6 +40,27 @@ def _strip_fences(text: str) -> str:
         if text.endswith("```"):
             text = text[:-3]
     return text.strip()
+
+
+_ENRICHED_FIELDS = [
+    ("summary", "Summary"),
+    ("whats_new", "What's new"),
+    ("key_concepts", "Key concepts"),
+    ("who_made_it", "Who made it"),
+    ("use_cases", "Use cases"),
+    ("importance_reasoning", "Why it matters"),
+]
+
+
+def _build_context_part(article_id: int, raw: dict, enriched: dict | None) -> str:
+    lines = [f"[Article {article_id}] {raw.get('title', '')} ({raw.get('source_name', '')})"]
+    for field, label in _ENRICHED_FIELDS:
+        value = (enriched or {}).get(field, "")
+        if isinstance(value, list):
+            value = ", ".join(v for v in value if v)
+        if value:
+            lines.append(f"{label}: {value}")
+    return "\n".join(lines)
 
 
 def _build_messages(query: str, context: str, history: list[dict]) -> list[dict]:
@@ -60,11 +88,7 @@ def answer_query(query: str, sqlite_store, chroma_store, n_results: int = 5, his
         enriched = sqlite_store.get_enriched_article(article_id)
         if raw is None:
             continue
-        summary = enriched.get("summary", "") if enriched else ""
-        context_parts.append(
-            f"[Article {article_id}] {raw.get('title', '')} ({raw.get('source_name', '')})\n"
-            f"Summary: {summary}"
-        )
+        context_parts.append(_build_context_part(article_id, raw, enriched))
         citations.append({
             "article_id": article_id,
             "title": raw.get("title", ""),
