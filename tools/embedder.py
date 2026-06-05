@@ -1,5 +1,18 @@
 import threading
+
 from sentence_transformers import SentenceTransformer
+
+import config
+
+# Cap torch CPU threads before the model runs so embedding can't monopolise
+# every core and starve the in-process Streamlit UI thread. Best-effort: if
+# torch isn't importable or the value is rejected, fall back to its default.
+try:
+    import torch
+
+    torch.set_num_threads(config.EMBED_TORCH_THREADS)
+except Exception:
+    pass
 
 _model: SentenceTransformer | None = None
 _lock = threading.Lock()

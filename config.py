@@ -35,3 +35,13 @@ CLUSTERING_THRESHOLD = float(os.environ.get("CLUSTERING_THRESHOLD", "0.75"))
 SENTIMENT_WINDOW_DAYS = int(os.environ.get("SENTIMENT_WINDOW_DAYS", "7"))
 ARTICLE_FILTER_THRESHOLD = float(os.environ.get("ARTICLE_FILTER_THRESHOLD", "0.5"))
 PARSE_MAX_WORKERS = int(os.environ.get("PARSE_MAX_WORKERS", "5"))
+
+# Cap PyTorch CPU threads used by the embedding model. The pipeline runs
+# in-process alongside the Streamlit UI; letting torch grab every core (its
+# default) starves the UI thread and makes the app feel frozen during a fetch.
+# Small batches don't benefit from many threads anyway, so cap to ~half the
+# cores (max 4) to leave headroom for the UI.
+_CPU_COUNT = os.cpu_count() or 4
+EMBED_TORCH_THREADS = int(
+    os.environ.get("EMBED_TORCH_THREADS", str(max(1, min(4, _CPU_COUNT // 2))))
+)
