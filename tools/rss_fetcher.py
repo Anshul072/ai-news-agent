@@ -1,15 +1,16 @@
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import feedparser
 
 
 def fetch_articles(feed_urls: list[str], since: datetime | None = None) -> list[dict]:
-    articles = []
-    for url in feed_urls:
+    def _fetch_one(url: str) -> list[dict]:
         try:
             feed = feedparser.parse(url)
             source_name = feed.feed.get("title", url)
+            results = []
             for entry in feed.entries:
                 link = entry.get("link", "")
                 if not link:
@@ -17,7 +18,7 @@ def fetch_articles(feed_urls: list[str], since: datetime | None = None) -> list[
                 published_at = _parse_date(entry)
                 if since is not None and _is_old(published_at, since):
                     continue
-                articles.append({
+                results.append({
                     "url": link,
                     "url_hash": hashlib.sha256(link.encode()).hexdigest(),
                     "title": entry.get("title", ""),
@@ -26,8 +27,14 @@ def fetch_articles(feed_urls: list[str], since: datetime | None = None) -> list[
                     "published_at": published_at,
                     "fetched_at": datetime.now(timezone.utc).isoformat(),
                 })
+            return results
         except Exception:
-            continue
+            return []
+
+    articles = []
+    with ThreadPoolExecutor() as executor:
+        for feed_articles in executor.map(_fetch_one, feed_urls):
+            articles.extend(feed_articles)
     return articles
 
 
