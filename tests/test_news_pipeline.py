@@ -70,6 +70,13 @@ def chroma_store():
     return ChromaStore(client=client, collection_name=f"test_{uuid.uuid4().hex}")
 
 
+@pytest.fixture(autouse=True)
+def _bypass_scraping():
+    """Pass article content through unchanged so no test makes real HTTP requests."""
+    with patch("pipelines.news_pipeline._scrape_content", side_effect=lambda url, fb: fb):
+        yield
+
+
 def _fake_embed(text: str) -> list[float]:
     # Deterministic non-zero vector so cosine similarity works
     return [abs(hash(text) % 1000) / 1000.0 + 0.001] * 768
@@ -264,6 +271,7 @@ def test_threshold_zero_all_articles_pass(sqlite_store, chroma_store, monkeypatc
     with patch("pipelines.news_pipeline.fetch_articles", return_value=FIXTURE_ARTICLES), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.0), \
+         patch("pipelines.news_pipeline._scrape_content", side_effect=lambda url, fb: fb), \
          patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
@@ -271,3 +279,47 @@ def test_threshold_zero_all_articles_pass(sqlite_store, chroma_store, monkeypatc
     assert len(raw) == 2
     for a in raw:
         assert sqlite_store.get_enriched_article(a["id"]) is not None
+
+
+# ---------------------------------------------------------------------------
+# Behavior 11: scraper replaces article content before parse step
+# ---------------------------------------------------------------------------
+
+def test_scraper_replaces_content_before_parse(sqlite_store, chroma_store):
+    scraped_body = "Full article body. " * 20  # well above min length
+    received_contents = []
+
+    def _capture_parse(articles):
+        received_contents.extend(a["content"] for a in articles)
+        return [
+            {**ENRICHED_TEMPLATE[i], "article_id": articles[i]["id"]}
+            for i in range(len(articles))
+        ]
+
+    with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
+         patch("pipelines.news_pipeline._scrape_content", return_value=scraped_body), \
+         patch("pipelines.news_pipeline._parse_articles", side_effect=_capture_parse), \
+         patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
+         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+        run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
+
+    assert received_contents == [scraped_body]
+
+
+# ---------------------------------------------------------------------------
+# Behavior 12: pipeline degrades gracefully when scraping fails for all articles
+# ---------------------------------------------------------------------------
+
+def test_pipeline_degrades_gracefully_when_scraping_fails(sqlite_store, chroma_store):
+    def _scrape_fails(url, fallback):
+        return fallback  # scraper returns original RSS snippet
+
+    with patch("pipelines.news_pipeline.fetch_articles", return_value=FIXTURE_ARTICLES), \
+         patch("pipelines.news_pipeline._scrape_content", side_effect=_scrape_fails), \
+         patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
+         patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
+         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+        result = run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
+
+    # Pipeline completes and stores articles using fallback content
+    assert result["stored_count"] == 2

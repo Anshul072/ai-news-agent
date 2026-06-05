@@ -7,6 +7,7 @@ from langgraph.graph import StateGraph, END
 import config
 from agents.news_parse_agent import parse_articles as _parse_articles
 from tools.article_filter import relevance_score as _relevance_score
+from tools.article_scraper import scrape_content as _scrape_content
 from tools.rss_fetcher import fetch_articles
 from tools.embedder import embed
 from tools.story_clustering import assign_story_group
@@ -50,6 +51,14 @@ def build_news_pipeline(sqlite_store, chroma_store):
         new = [a for a in state["raw_articles"] if not sqlite_store.url_hash_exists(a["url_hash"])]
         logger.info("Dedup: %d new / %d total", len(new), len(state["raw_articles"]))
         return {"new_articles": new}
+
+    def scrape_articles(state: _State) -> dict:
+        scraped = []
+        for article in state["new_articles"]:
+            body = _scrape_content(article["url"], article.get("content", ""))
+            scraped.append({**article, "content": body})
+        logger.info("Scraping complete: %d articles", len(scraped))
+        return {"new_articles": scraped}
 
     def parse_articles_node(state: _State) -> dict:
         parsed = []
@@ -138,12 +147,14 @@ def build_news_pipeline(sqlite_store, chroma_store):
     graph = StateGraph(_State)
     graph.add_node("fetch_rss", fetch_rss)
     graph.add_node("dedup_check", dedup_check)
+    graph.add_node("scrape_articles", scrape_articles)
     graph.add_node("parse_articles", parse_articles_node)
     graph.add_node("cluster_and_store", cluster_and_store)
 
     graph.set_entry_point("fetch_rss")
     graph.add_edge("fetch_rss", "dedup_check")
-    graph.add_edge("dedup_check", "parse_articles")
+    graph.add_edge("dedup_check", "scrape_articles")
+    graph.add_edge("scrape_articles", "parse_articles")
     graph.add_edge("parse_articles", "cluster_and_store")
     graph.add_edge("cluster_and_store", END)
 
