@@ -82,6 +82,10 @@ def _fake_embed(text: str) -> list[float]:
     return [abs(hash(text) % 1000) / 1000.0 + 0.001] * 768
 
 
+def _fake_embed_many(texts: list[str]) -> list[list[float]]:
+    return [_fake_embed(t) for t in texts]
+
+
 def _make_parse_mock(templates):
     """Returns a side_effect function that injects article_id from the passed articles."""
     def _parse(articles):
@@ -100,7 +104,7 @@ def test_pipeline_stores_enriched_articles_in_sqlite(sqlite_store, chroma_store)
     with patch("pipelines.news_pipeline.fetch_articles", return_value=FIXTURE_ARTICLES), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     articles = sqlite_store.get_all_raw_articles()
@@ -120,7 +124,7 @@ def test_pipeline_stores_field_chunks_in_chromadb(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     raw = sqlite_store.get_all_raw_articles()
@@ -146,7 +150,7 @@ def test_pipeline_continues_on_parse_failure(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=FIXTURE_ARTICLES), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_partial_parse), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     enriched_articles = [
@@ -170,13 +174,13 @@ def test_pipeline_dedup_prevents_duplicate_records(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(**common_kwargs)
 
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(**common_kwargs)
 
     assert len(sqlite_store.get_all_raw_articles()) == 1
@@ -190,7 +194,7 @@ def test_filtered_article_in_raw_not_in_enriched(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.1), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     raw = sqlite_store.get_all_raw_articles()
@@ -206,7 +210,7 @@ def test_filtered_article_produces_warning_log(sqlite_store, chroma_store, caplo
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.1), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         with caplog.at_level(logging.WARNING, logger="pipelines.news_pipeline"):
             run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
@@ -223,7 +227,7 @@ def test_passing_article_produces_info_log(sqlite_store, chroma_store, caplog):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         with caplog.at_level(logging.INFO, logger="pipelines.news_pipeline"):
             run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
@@ -241,7 +245,7 @@ def test_groq_never_called_for_filtered_article(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", mock_parse), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.1), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     mock_parse.assert_not_called()
@@ -255,7 +259,7 @@ def test_chroma_gets_no_chunks_for_filtered_article(sqlite_store, chroma_store):
     with patch("pipelines.news_pipeline.fetch_articles", return_value=[FIXTURE_ARTICLES[0]]), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.1), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     results = chroma_store._collection.get(include=["metadatas"])
@@ -272,7 +276,7 @@ def test_threshold_zero_all_articles_pass(sqlite_store, chroma_store, monkeypatc
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.0), \
          patch("pipelines.news_pipeline._scrape_content", side_effect=lambda url, fb: fb), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     raw = sqlite_store.get_all_raw_articles()
@@ -300,7 +304,7 @@ def test_scraper_replaces_content_before_parse(sqlite_store, chroma_store):
          patch("pipelines.news_pipeline._scrape_content", return_value=scraped_body), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_capture_parse), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     assert received_contents == [scraped_body]
@@ -318,7 +322,7 @@ def test_pipeline_degrades_gracefully_when_scraping_fails(sqlite_store, chroma_s
          patch("pipelines.news_pipeline._scrape_content", side_effect=_scrape_fails), \
          patch("pipelines.news_pipeline._parse_articles", side_effect=_make_parse_mock(ENRICHED_TEMPLATE)), \
          patch("pipelines.news_pipeline._relevance_score", return_value=0.9), \
-         patch("pipelines.news_pipeline.embed", side_effect=_fake_embed):
+         patch("pipelines.news_pipeline.embed_many", side_effect=_fake_embed_many):
         result = run_news_pipeline(["https://fake.feed"], sqlite_store, chroma_store)
 
     # Pipeline completes and stores articles using fallback content

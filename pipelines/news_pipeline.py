@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import TypedDict
 
@@ -9,7 +10,7 @@ from agents.news_parse_agent import parse_articles as _parse_articles
 from tools.article_filter import relevance_score as _relevance_score
 from tools.article_scraper import scrape_content as _scrape_content
 from tools.rss_fetcher import fetch_articles
-from tools.embedder import embed
+from tools.embedder import embed, embed_many
 from tools.story_clustering import assign_story_group
 
 logger = logging.getLogger(__name__)
@@ -52,8 +53,26 @@ def build_news_pipeline(sqlite_store, chroma_store):
         logger.info("Scraping complete: %d articles", len(scraped))
         return {"new_articles": scraped}
 
+    def _parse_one(article_with_id: dict) -> list[dict]:
+        try:
+            results = _parse_articles([article_with_id])
+            if results:
+                logger.info("Parsed: %s", article_with_id.get("title", "untitled")[:80])
+                return results
+            clen = len(article_with_id.get("content", ""))
+            logger.warning(
+                "Parse returned empty for: %s (content=%d chars, min=%d)",
+                article_with_id.get("title", "?")[:60], clen, 200,
+            )
+            return []
+        except Exception as exc:
+            logger.warning("Parse failed for %s: %s", article_with_id.get("title", "?")[:60], exc)
+            return []
+
     def parse_articles_node(state: _State) -> dict:
-        parsed = []
+        # Insert + relevance filter sequentially (fast, deterministic logging),
+        # then parse the survivors concurrently — parsing is the LLM-bound step.
+        candidates = []
         for article in state["new_articles"]:
             sqlite_store.insert_raw_article(article)
             db_article = sqlite_store.get_raw_article_by_url_hash(article["url_hash"])
@@ -71,20 +90,13 @@ def build_news_pipeline(sqlite_store, chroma_store):
                 "Article passed filter (score=%.3f): %s",
                 score, article.get("title", "?")[:80],
             )
-            try:
-                results = _parse_articles([article_with_id])
-                if results:
+            candidates.append(article_with_id)
+
+        parsed = []
+        if candidates:
+            with ThreadPoolExecutor(max_workers=config.PARSE_MAX_WORKERS) as executor:
+                for results in executor.map(_parse_one, candidates):
                     parsed.extend(results)
-                    logger.info("Parsed: %s", article.get("title", "untitled")[:80])
-                else:
-                    clen = len(article_with_id.get("content", ""))
-                    logger.warning(
-                        "Parse returned empty for: %s (content=%d chars, min=%d)",
-                        article.get("title", "?")[:60], clen, 200,
-                    )
-            except Exception as exc:
-                logger.warning("Parse failed for %s: %s", article.get("title", "?")[:60], exc)
-                continue
         logger.info("Parsing complete: %d articles enriched", len(parsed))
         return {"parsed_articles": parsed}
 
@@ -100,8 +112,14 @@ def build_news_pipeline(sqlite_store, chroma_store):
                     continue
                 raw = dict(db_article)
 
-                summary = item.get("summary", "")
-                summary_embedding = embed(summary)
+                # Embed the summary and every field text in a single batched
+                # encode() call rather than one forward pass per field.
+                field_texts = _get_field_texts(item)
+                fields = list(field_texts.keys())
+                vectors = embed_many([field_texts[f] for f in fields])
+                embeddings_by_field = dict(zip(fields, vectors))
+
+                summary_embedding = embeddings_by_field["summary"]
 
                 story_group_id = assign_story_group(
                     article_id=article_id,
@@ -113,11 +131,10 @@ def build_news_pipeline(sqlite_store, chroma_store):
 
                 sqlite_store.insert_enriched_article(article_id, item, story_group_id)
 
-                field_texts = _get_field_texts(item)
                 field_embeddings = {
-                    field: embed(text)
-                    for field, text in field_texts.items()
-                    if text
+                    field: embeddings_by_field[field]
+                    for field in fields
+                    if field_texts[field]
                 }
 
                 chroma_store.insert_chunks(
