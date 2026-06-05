@@ -106,10 +106,20 @@ def _merge_cluster(articles: list[dict]) -> dict:
     }
 
 
+@st.cache_data(ttl=60)
+def _cached_story_clusters(_store: SQLiteStore) -> list[dict]:
+    return _store.get_story_clusters()
+
+
+@st.cache_data(ttl=60)
+def _cached_sentiment_history(_store: SQLiteStore) -> dict:
+    return _store.get_all_sentiment_history()
+
+
 def render_feed(sqlite_store: SQLiteStore) -> None:
     st.header("AI News Feed")
-    clusters = sqlite_store.get_story_clusters()
-    sentiment_history = sqlite_store.get_all_sentiment_history()
+    clusters = _cached_story_clusters(sqlite_store)
+    sentiment_history = _cached_sentiment_history(sqlite_store)
 
     if not clusters:
         st.info("No stories yet. Use the sidebar to fetch news.")
@@ -337,6 +347,8 @@ def _run_news():
         result = _pipeline_result()
         result["status"] = "news_error"
         result["error"] = str(exc)
+    finally:
+        st.cache_data.clear()
 
 
 def _run_sentiment():
@@ -347,6 +359,8 @@ def _run_sentiment():
         result = _pipeline_result()
         result["status"] = "sentiment_error"
         result["error"] = str(exc)
+    finally:
+        st.cache_data.clear()
 
 
 def main():
