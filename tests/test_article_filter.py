@@ -69,7 +69,7 @@ def test_is_relevant_returns_false_for_low_similarity(af):
 # ---------------------------------------------------------------------------
 
 def test_is_relevant_returns_true_at_exact_threshold(af):
-    at_threshold = _at_threshold(0.45)
+    at_threshold = _at_threshold(0.5)
     with patch("tools.article_filter._SEED_EMBEDDINGS", _SEED_VECS), \
          patch("tools.embedder.embed", return_value=at_threshold):
         assert af.is_relevant({"title": "test", "content": "test"}) is True
