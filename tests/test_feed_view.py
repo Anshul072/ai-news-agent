@@ -1,5 +1,11 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from storage.sqlite_store import SQLiteStore
+
+# Window wide enough that the fixed-date fixtures below always fall inside it,
+# so tests that assert grouping/ordering are independent of the date window.
+_ALL_TIME = 100_000
 
 
 @pytest.fixture
@@ -47,7 +53,7 @@ def _insert_article(store, url_hash, title, source_name, published_at, importanc
 # ---------------------------------------------------------------------------
 
 def test_get_story_clusters_empty(store):
-    assert store.get_story_clusters() == []
+    assert store.get_story_clusters(days=_ALL_TIME) == []
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +62,7 @@ def test_get_story_clusters_empty(store):
 
 def test_get_story_clusters_single_cluster(store):
     _insert_article(store, "hash1", "Title 1", "Source A", "2024-01-01T12:00:00", 7)
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert len(clusters) == 1
     c = clusters[0]
     assert c["title"] == "Title 1"
@@ -76,7 +82,7 @@ def test_get_story_clusters_ordered_by_date_then_importance(store):
     _insert_article(store, "hash2", "Mid High", "Source B", "2024-01-02T12:00:00", 9)
     _insert_article(store, "hash3", "New Medium", "Source C", "2024-01-03T12:00:00", 6)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     titles = [c["title"] for c in clusters]
     # Newest date first regardless of importance score
     assert titles == ["New Medium", "Mid High", "Old Low"]
@@ -87,7 +93,7 @@ def test_get_story_clusters_same_date_ordered_by_importance(store):
     _insert_article(store, "hash2", "High Score", "Source B", "2024-01-01T11:00:00", 9)
     _insert_article(store, "hash3", "Mid Score", "Source C", "2024-01-01T12:00:00", 6)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     scores = [c["importance_score"] for c in clusters]
     assert scores == sorted(scores, reverse=True)
 
@@ -100,7 +106,7 @@ def test_get_story_clusters_groups_articles_by_story_group(store):
     article_id1, group_id = _insert_article(store, "hash1", "Title 1", "Source A", "2024-01-01T12:00:00", 7)
     _insert_article(store, "hash2", "Title 1 (Reuters)", "Source B", "2024-01-02T12:00:00", 6, group_id)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert len(clusters) == 1
     assert clusters[0]["source_count"] == 2
     assert set(clusters[0]["source_names"]) == {"Source A", "Source B"}
@@ -114,7 +120,7 @@ def test_get_story_clusters_title_from_highest_importance_article(store):
     article_id1, group_id = _insert_article(store, "hash1", "Low Importance Title", "Source A", "2024-01-01T12:00:00", 3)
     _insert_article(store, "hash2", "High Importance Title", "Source B", "2024-01-02T12:00:00", 9, group_id)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert clusters[0]["title"] == "High Importance Title"
     assert clusters[0]["importance_score"] == 9
 
@@ -138,7 +144,7 @@ def test_get_story_clusters_includes_sentiment_when_present(store):
         "last_scanned_at": "2024-01-01T14:00:00",
     })
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert clusters[0]["sentiment_label"] == "Positive"
     assert clusters[0]["sentiment_score"] == pytest.approx(0.8)
 
@@ -149,7 +155,7 @@ def test_get_story_clusters_includes_sentiment_when_present(store):
 
 def test_get_story_clusters_sentiment_none_when_absent(store):
     _insert_article(store, "hash1", "Title 1", "Source A", "2024-01-01T12:00:00", 7)
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert clusters[0]["sentiment_label"] is None
     assert clusters[0]["sentiment_score"] is None
 
@@ -162,7 +168,7 @@ def test_get_story_clusters_published_date_range(store):
     article_id1, group_id = _insert_article(store, "hash1", "Title 1", "Source A", "2024-01-01T12:00:00", 7)
     _insert_article(store, "hash2", "Title 1 v2", "Source B", "2024-01-05T12:00:00", 6, group_id)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     assert clusters[0]["published_at_min"] == "2024-01-01T12:00:00"
     assert clusters[0]["published_at_max"] == "2024-01-05T12:00:00"
 
@@ -174,7 +180,7 @@ def test_get_story_clusters_published_date_range(store):
 def test_get_story_clusters_includes_article_details(store):
     _insert_article(store, "hash1", "Title 1", "Source A", "2024-01-01T12:00:00", 7)
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     articles = clusters[0]["articles"]
     assert len(articles) == 1
     a = articles[0]
@@ -203,9 +209,31 @@ def test_get_story_clusters_articles_include_sentiment_details(store):
         "last_scanned_at": "2024-01-01T14:00:00",
     })
 
-    clusters = store.get_story_clusters()
+    clusters = store.get_story_clusters(days=_ALL_TIME)
     a = clusters[0]["articles"][0]
     assert a["sentiment_label"] == "Mixed"
     assert a["top_concerns"] == ["privacy"]
     assert a["notable_quotes"] == ["interesting quote"]
     assert a["subreddit_breakdown"] == {"r/MachineLearning": "positive"}
+
+
+# ---------------------------------------------------------------------------
+# Behavior 11: articles outside the date window are excluded from the feed
+# ---------------------------------------------------------------------------
+
+def test_get_story_clusters_excludes_articles_outside_window(store):
+    now = datetime.now(timezone.utc)
+    recent = (now - timedelta(days=2)).isoformat()
+    old = (now - timedelta(days=100)).isoformat()
+
+    _insert_article(store, "recent", "Recent Story", "Source A", recent, 7)
+    _insert_article(store, "old", "Old Story", "Source B", old, 9)
+
+    # Default-ish 30-day window: only the recent story is returned.
+    clusters = store.get_story_clusters(days=30)
+    titles = [c["title"] for c in clusters]
+    assert titles == ["Recent Story"]
+
+    # A wide window includes both.
+    all_titles = {c["title"] for c in store.get_story_clusters(days=_ALL_TIME)}
+    assert all_titles == {"Recent Story", "Old Story"}

@@ -302,9 +302,16 @@ class SQLiteStore:
             result[row["article_id"]].append(dict(row))
         return dict(result)
 
-    def get_story_clusters(self) -> list[dict]:
-        """Returns story clusters ordered by max importance_score descending."""
+    def get_story_clusters(self, days: int = 30) -> list[dict]:
+        """Returns story clusters ordered by max importance_score descending.
+
+        Only articles published within the last ``days`` days are considered, so
+        per-load work stays bounded regardless of total database size. The
+        ``published_at`` filter is served by the idx_raw_published_at index.
+        """
+        from datetime import timedelta
         from collections import defaultdict
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         conn = self._get_conn()
         rows = conn.execute(
             """
@@ -321,8 +328,10 @@ class SQLiteStore:
             LEFT JOIN article_sentiment s ON s.article_id = r.id
             LEFT JOIN story_groups sg ON sg.id = e.story_group_id
             WHERE e.story_group_id IS NOT NULL
+              AND r.published_at >= ?
             ORDER BY e.importance_score DESC
-            """
+            """,
+            (cutoff,),
         ).fetchall()
 
         groups: dict = defaultdict(list)
