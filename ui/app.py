@@ -2,7 +2,6 @@ import sys
 import os
 import logging
 import threading
-import time
 from datetime import datetime
 from itertools import groupby
 
@@ -281,6 +280,31 @@ def _render_citations(citations: list[dict]) -> None:
             st.caption(f"- {label}")
 
 
+@st.fragment(run_every=2)
+def _pipeline_status_display():
+    # Sync cross-thread result into session_state (background threads can't touch session_state directly)
+    _result = _pipeline_result()
+    if _result["status"]:
+        st.session_state.pipeline_status = _result["status"]
+        st.session_state.pipeline_error = _result["error"]
+        _result["status"] = ""
+        _result["error"] = ""
+
+    status = st.session_state.get("pipeline_status", "")
+    if status == "news_running":
+        st.info("⏳ Fetching news…")
+    elif status == "sentiment_running":
+        st.info("⏳ Analysing sentiment…")
+    elif status == "news_done":
+        st.success("✅ News fetch complete")
+    elif status == "sentiment_done":
+        st.success("✅ Sentiment analysis complete")
+    elif status == "news_error":
+        st.error(f"❌ News pipeline failed: {st.session_state.get('pipeline_error', '')}")
+    elif status == "sentiment_error":
+        st.error(f"❌ Sentiment pipeline failed: {st.session_state.get('pipeline_error', '')}")
+
+
 def render_sidebar() -> None:
     with st.sidebar:
         st.title("AI News Agent")
@@ -289,40 +313,18 @@ def render_sidebar() -> None:
         st.divider()
         st.subheader("Pipelines")
 
-        # Sync cross-thread result into session_state (background threads can't touch session_state directly)
-        _result = _pipeline_result()
-        if _result["status"]:
-            st.session_state.pipeline_status = _result["status"]
-            st.session_state.pipeline_error = _result["error"]
-            _result["status"] = ""
-            _result["error"] = ""
-
         if "pipeline_status" not in st.session_state:
             st.session_state.pipeline_status = ""
 
         if st.button("Fetch news now", use_container_width=True):
             st.session_state.pipeline_status = "news_running"
             threading.Thread(target=_run_news, daemon=True).start()
-            st.rerun()
 
         if st.button("Refresh sentiment now", use_container_width=True):
             st.session_state.pipeline_status = "sentiment_running"
             threading.Thread(target=_run_sentiment, daemon=True).start()
-            st.rerun()
 
-        status = st.session_state.get("pipeline_status", "")
-        if status == "news_running":
-            st.info("⏳ Fetching news…")
-        elif status == "sentiment_running":
-            st.info("⏳ Analysing sentiment…")
-        elif status == "news_done":
-            st.success("✅ News fetch complete")
-        elif status == "sentiment_done":
-            st.success("✅ Sentiment analysis complete")
-        elif status == "news_error":
-            st.error(f"❌ News pipeline failed: {st.session_state.get('pipeline_error', '')}")
-        elif status == "sentiment_error":
-            st.error(f"❌ Sentiment pipeline failed: {st.session_state.get('pipeline_error', '')}")
+        _pipeline_status_display()
 
     return view
 
@@ -356,10 +358,6 @@ def main():
         render_feed(sqlite_store)
     else:
         render_chat(sqlite_store, chroma_store)
-
-    if st.session_state.get("pipeline_status") in ("news_running", "sentiment_running"):
-        time.sleep(3)
-        st.rerun()
 
 
 if __name__ == "__main__":
