@@ -1,18 +1,32 @@
 import json
 import sqlite3
+import threading
 from datetime import datetime, timezone
 
 
 class SQLiteStore:
     def __init__(self, db_path: str = "storage/news.db"):
         self.db_path = db_path
-        self._conn: sqlite3.Connection | None = None
+        # Each thread (Streamlit main thread, pipeline workers) gets its own
+        # connection. Sharing a single sqlite3.Connection across threads is not
+        # safe even with check_same_thread=False, and a writer in one thread
+        # would block readers in another under the default rollback journal.
+        self._local = threading.local()
 
     def _get_conn(self) -> sqlite3.Connection:
-        if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-        return self._conn
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            # WAL lets readers run concurrently with a single writer;
+            # synchronous=NORMAL halves write fsync cost while staying crash-safe
+            # under WAL; busy_timeout makes statements wait for a lock instead of
+            # erroring with "database is locked".
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            self._local.conn = conn
+        return conn
 
     def init_db(self) -> None:
         conn = self._get_conn()
