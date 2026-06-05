@@ -290,7 +290,7 @@ def _render_citations(citations: list[dict]) -> None:
             st.caption(f"- {label}")
 
 
-@st.fragment(run_every=2)
+@st.fragment(run_every=5)
 def _pipeline_status_display():
     # Sync cross-thread result into session_state (background threads can't touch session_state directly)
     _result = _pipeline_result()
@@ -318,7 +318,7 @@ def _pipeline_status_display():
 def render_sidebar() -> None:
     with st.sidebar:
         st.title("AI News Agent")
-        view = st.radio("View", ["Feed", "Chat"], label_visibility="collapsed")
+        view = st.radio("View", ["Feed", "Chat"], label_visibility="collapsed", key="view")
 
         st.divider()
         st.subheader("Pipelines")
