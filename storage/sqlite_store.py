@@ -78,6 +78,11 @@ class SQLiteStore:
                 importance_score     INTEGER,
                 importance_reasoning TEXT
             );
+
+            CREATE INDEX IF NOT EXISTS idx_enriched_story_group ON enriched_articles(story_group_id);
+            CREATE INDEX IF NOT EXISTS idx_enriched_importance ON enriched_articles(importance_score);
+            CREATE INDEX IF NOT EXISTS idx_raw_published_at ON raw_articles(published_at);
+            CREATE INDEX IF NOT EXISTS idx_sentiment_history_article ON sentiment_history(article_id);
         """)
         conn.commit()
         try:
@@ -295,10 +300,12 @@ class SQLiteStore:
                    e.importance_score, e.importance_reasoning,
                    s.sentiment_label, s.sentiment_score, s.excitement_level,
                    s.top_concerns, s.top_use_cases, s.notable_quotes,
-                   s.subreddit_breakdown, s.thread_count, s.total_comments, s.hn_thread_urls
+                   s.subreddit_breakdown, s.thread_count, s.total_comments, s.hn_thread_urls,
+                   sg.source_count
             FROM raw_articles r
             JOIN enriched_articles e ON e.article_id = r.id
             LEFT JOIN article_sentiment s ON s.article_id = r.id
+            LEFT JOIN story_groups sg ON sg.id = e.story_group_id
             WHERE e.story_group_id IS NOT NULL
             ORDER BY e.importance_score DESC
             """
@@ -320,8 +327,7 @@ class SQLiteStore:
         clusters = []
         for story_group_id, articles in groups.items():
             best = articles[0]
-            sg = self.get_story_group(story_group_id)
-            source_count = sg["source_count"] if sg else len(articles)
+            source_count = best["source_count"] or len(articles)
             source_names = list(dict.fromkeys(a["source_name"] for a in articles))
             published_dates = [a["published_at"] for a in articles if a["published_at"]]
             clusters.append({
