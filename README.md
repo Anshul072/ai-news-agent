@@ -55,6 +55,7 @@ Optional:
 
 | Variable | Default | Description |
 |---|---|---|
+| `RSS_FEEDS` | 11 curated sources | Comma-separated RSS feed URLs (Arxiv, OpenAI, Anthropic, DeepMind, Meta AI, Mistral, Ars Technica, The Verge, The Batch, Import AI) |
 | `ARTICLE_FILTER_THRESHOLD` | `0.5` | Cosine similarity cutoff for relevance pre-filter |
 | `CLUSTERING_THRESHOLD` | `0.75` | Cosine similarity threshold for story grouping |
 | `SENTIMENT_WINDOW_DAYS` | `7` | Rolling window for sentiment re-scans |
