@@ -16,3 +16,10 @@ def _get_model() -> SentenceTransformer:
 
 def embed(text: str) -> list[float]:
     return _get_model().encode(text).tolist()
+
+
+def embed_many(texts: list[str]) -> list[list[float]]:
+    """Embed a list of texts in a single batched ``encode()`` forward pass."""
+    if not texts:
+        return []
+    return _get_model().encode(texts).tolist()
