@@ -290,7 +290,9 @@ def _render_citations(citations: list[dict]) -> None:
             st.caption(f"- {label}")
 
 
-@st.fragment(run_every=5)
+_RUNNING_STATUSES = ("news_running", "sentiment_running")
+
+
 def _pipeline_status_display():
     # Sync cross-thread result into session_state (background threads can't touch session_state directly)
     _result = _pipeline_result()
@@ -314,6 +316,13 @@ def _pipeline_status_display():
     elif status == "sentiment_error":
         st.error(f"❌ Sentiment pipeline failed: {st.session_state.get('pipeline_error', '')}")
 
+    # This fragment auto-reruns (run_every) only while a pipeline is running. When
+    # a poll observes the pipeline has finished, trigger a full-app rerun so
+    # run_every is recomputed to None and the periodic polling stops.
+    if status not in _RUNNING_STATUSES and st.session_state.get("pipeline_polling"):
+        st.session_state.pipeline_polling = False
+        st.rerun()
+
 
 def render_sidebar() -> None:
     with st.sidebar:
@@ -334,7 +343,10 @@ def render_sidebar() -> None:
             st.session_state.pipeline_status = "sentiment_running"
             threading.Thread(target=_run_sentiment, daemon=True).start()
 
-        _pipeline_status_display()
+        # Poll only while a pipeline is running; idle otherwise (run_every=None).
+        running = st.session_state.get("pipeline_status", "") in _RUNNING_STATUSES
+        st.session_state.pipeline_polling = running
+        st.fragment(_pipeline_status_display, run_every=2 if running else None)()
 
     return view
 
