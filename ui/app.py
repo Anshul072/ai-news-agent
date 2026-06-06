@@ -236,7 +236,7 @@ def _render_sentiment_section(article: dict, history: list[dict]) -> None:
             }
             for h in history
         ]
-        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+        st.dataframe(table_rows, width="stretch", hide_index=True)
 
 
 def render_chat(sqlite_store: SQLiteStore, chroma_store: ChromaStore) -> None:
@@ -348,11 +348,11 @@ def render_sidebar() -> None:
         if "pipeline_status" not in st.session_state:
             st.session_state.pipeline_status = ""
 
-        if st.button("Fetch news now", use_container_width=True):
+        if st.button("Fetch news now", width="stretch"):
             st.session_state.pipeline_status = "news_running"
             threading.Thread(target=_run_news, args=(_pipeline_result(),), daemon=True).start()
 
-        if st.button("Refresh sentiment now", use_container_width=True):
+        if st.button("Refresh sentiment now", width="stretch"):
             st.session_state.pipeline_status = "sentiment_running"
             threading.Thread(target=_run_sentiment, args=(_pipeline_result(),), daemon=True).start()
 
