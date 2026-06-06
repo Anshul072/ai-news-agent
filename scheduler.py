@@ -27,6 +27,7 @@ def _get_stores():
 
 
 def trigger_news_pipeline():
+    logger.info("News pipeline triggered.")
     try:
         sqlite_store, chroma_store = _get_stores()
         run_news_pipeline(config.RSS_FEEDS, sqlite_store, chroma_store)
@@ -36,6 +37,7 @@ def trigger_news_pipeline():
 
 
 def trigger_sentiment_pipeline():
+    logger.info("Sentiment pipeline triggered.")
     try:
         sqlite_store, chroma_store = _get_stores()
         run_sentiment_pipeline(sqlite_store, chroma_store)

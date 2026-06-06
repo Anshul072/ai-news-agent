@@ -16,7 +16,17 @@ _SEED_PHRASES: list[str] = [
     "large language model fine-tuning techniques",
 ]
 
-_SEED_EMBEDDINGS: list[list[float]] = [tools.embedder.embed(p) for p in _SEED_PHRASES]
+_seed_embeddings: list[list[float]] | None = None
+
+
+def _get_seed_embeddings() -> list[list[float]]:
+    # Computed lazily on first use: embedding the seeds at import time would
+    # pull in the model (and torch) and block whoever imports this module,
+    # including the Streamlit UI via the news pipeline.
+    global _seed_embeddings
+    if _seed_embeddings is None:
+        _seed_embeddings = [tools.embedder.embed(p) for p in _SEED_PHRASES]
+    return _seed_embeddings
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -35,7 +45,7 @@ def relevance_score(article: dict) -> float:
     article_vec = tools.embedder.embed(text)
     return max(
         _cosine_similarity(article_vec, seed_vec)
-        for seed_vec in _SEED_EMBEDDINGS
+        for seed_vec in _get_seed_embeddings()
     )
 
 

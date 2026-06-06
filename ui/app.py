@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 logging.getLogger("google_genai.models").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+logging.getLogger("fastembed").setLevel(logging.WARNING)
 
 import streamlit as st
 
@@ -293,15 +293,22 @@ def _render_citations(citations: list[dict]) -> None:
 _RUNNING_STATUSES = ("news_running", "sentiment_running")
 
 
-def _pipeline_status_display():
-    # Sync cross-thread result into session_state (background threads can't touch session_state directly)
+def _sync_pipeline_result() -> None:
+    # Pull the cross-thread worker result into session_state (the worker thread
+    # has no ScriptRunContext, so it can only write the plain _pipeline_result
+    # dict; the sync onto session_state must happen here on the main thread).
     _result = _pipeline_result()
     if _result["status"]:
         st.session_state.pipeline_status = _result["status"]
         st.session_state.pipeline_error = _result["error"]
         _result["status"] = ""
         _result["error"] = ""
+        # Worker only writes terminal statuses, so the pipeline has finished:
+        # drop the feed/sentiment caches so the next rerun shows fresh data.
+        st.cache_data.clear()
 
+
+def _render_pipeline_status() -> None:
     status = st.session_state.get("pipeline_status", "")
     if status == "news_running":
         st.info("⏳ Fetching news…")
@@ -316,12 +323,18 @@ def _pipeline_status_display():
     elif status == "sentiment_error":
         st.error(f"❌ Sentiment pipeline failed: {st.session_state.get('pipeline_error', '')}")
 
-    # This fragment auto-reruns (run_every) only while a pipeline is running. When
-    # a poll observes the pipeline has finished, trigger a full-app rerun so
-    # run_every is recomputed to None and the periodic polling stops.
-    if status not in _RUNNING_STATUSES and st.session_state.get("pipeline_polling"):
-        st.session_state.pipeline_polling = False
-        st.rerun()
+
+# Mounted only while a pipeline is running. run_every must be a constant on a
+# stable (module-level) fragment — recreating the fragment inline each rerun or
+# toggling run_every silently breaks the recurring timer. We stop the polling by
+# *unmounting* the fragment instead: once the pipeline finishes we trigger a full
+# rerun, after which render_sidebar no longer calls this fragment.
+@st.fragment(run_every=2)
+def _poll_pipeline_status() -> None:
+    _sync_pipeline_result()
+    _render_pipeline_status()
+    if st.session_state.get("pipeline_status", "") not in _RUNNING_STATUSES:
+        st.rerun()  # finished — full rerun unmounts this fragment, stopping the poll
 
 
 def render_sidebar() -> None:
@@ -337,42 +350,45 @@ def render_sidebar() -> None:
 
         if st.button("Fetch news now", use_container_width=True):
             st.session_state.pipeline_status = "news_running"
-            threading.Thread(target=_run_news, daemon=True).start()
+            threading.Thread(target=_run_news, args=(_pipeline_result(),), daemon=True).start()
 
         if st.button("Refresh sentiment now", use_container_width=True):
             st.session_state.pipeline_status = "sentiment_running"
-            threading.Thread(target=_run_sentiment, daemon=True).start()
+            threading.Thread(target=_run_sentiment, args=(_pipeline_result(),), daemon=True).start()
 
-        # Poll only while a pipeline is running; idle otherwise (run_every=None).
-        running = st.session_state.get("pipeline_status", "") in _RUNNING_STATUSES
-        st.session_state.pipeline_polling = running
-        st.fragment(_pipeline_status_display, run_every=2 if running else None)()
+        # While a pipeline runs, mount the polling fragment (auto-reruns every 2s
+        # to catch completion). When idle/finished, just render the static status
+        # — no fragment, so no perpetual polling.
+        if st.session_state.get("pipeline_status", "") in _RUNNING_STATUSES:
+            _poll_pipeline_status()
+        else:
+            _sync_pipeline_result()
+            _render_pipeline_status()
 
     return view
 
 
-def _run_news():
+# These run in a background thread WITHOUT a Streamlit ScriptRunContext, so they
+# must not touch st.* (cache, session_state, rerun) — doing so races with the
+# main thread and wedges the session. They only mutate the plain `result` dict
+# captured on the main thread; the polling fragment picks it up and does all the
+# Streamlit work (cache clear, status sync, rerun) on the main thread.
+def _run_news(result: dict):
     try:
         trigger_news_pipeline()
-        _pipeline_result()["status"] = "news_done"
+        result["status"] = "news_done"
     except Exception as exc:
-        result = _pipeline_result()
         result["status"] = "news_error"
         result["error"] = str(exc)
-    finally:
-        st.cache_data.clear()
 
 
-def _run_sentiment():
+def _run_sentiment(result: dict):
     try:
         trigger_sentiment_pipeline()
-        _pipeline_result()["status"] = "sentiment_done"
+        result["status"] = "sentiment_done"
     except Exception as exc:
-        result = _pipeline_result()
         result["status"] = "sentiment_error"
         result["error"] = str(exc)
-    finally:
-        st.cache_data.clear()
 
 
 def main():

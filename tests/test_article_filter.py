@@ -49,7 +49,7 @@ def af():
 # ---------------------------------------------------------------------------
 
 def test_is_relevant_returns_true_for_high_similarity(af):
-    with patch("tools.article_filter._SEED_EMBEDDINGS", _SEED_VECS), \
+    with patch("tools.article_filter._seed_embeddings", _SEED_VECS), \
          patch("tools.embedder.embed", return_value=_RELEVANT):
         assert af.is_relevant({"title": "GPT-5 released", "content": "new model"}) is True
 
@@ -59,7 +59,7 @@ def test_is_relevant_returns_true_for_high_similarity(af):
 # ---------------------------------------------------------------------------
 
 def test_is_relevant_returns_false_for_low_similarity(af):
-    with patch("tools.article_filter._SEED_EMBEDDINGS", _SEED_VECS), \
+    with patch("tools.article_filter._seed_embeddings", _SEED_VECS), \
          patch("tools.embedder.embed", return_value=_IRRELEVANT):
         assert af.is_relevant({"title": "Sports news", "content": "football"}) is False
 
@@ -70,24 +70,29 @@ def test_is_relevant_returns_false_for_low_similarity(af):
 
 def test_is_relevant_returns_true_at_exact_threshold(af):
     at_threshold = _at_threshold(0.5)
-    with patch("tools.article_filter._SEED_EMBEDDINGS", _SEED_VECS), \
+    with patch("tools.article_filter._seed_embeddings", _SEED_VECS), \
          patch("tools.embedder.embed", return_value=at_threshold):
         assert af.is_relevant({"title": "test", "content": "test"}) is True
 
 
 # ---------------------------------------------------------------------------
-# Behavior 4: seed embeddings computed exactly once at module load, not per call
+# Behavior 4: seed embeddings are computed lazily on first use (not at import,
+# which would pull in the model and block whoever imports this module) and then
+# cached — computed exactly once, not per call.
 # ---------------------------------------------------------------------------
 
-def test_seed_embeddings_computed_once_at_module_load():
+def test_seed_embeddings_computed_once_on_first_use():
     with patch("tools.embedder.embed", return_value=_unit_vec(0)) as mock_embed:
         import tools.article_filter as module
         importlib.reload(module)
-        seed_call_count = mock_embed.call_count
-        assert seed_call_count == 10
+        # Lazy: importing the module embeds nothing.
+        assert mock_embed.call_count == 0
 
         module.is_relevant({"title": "a", "content": "b"})
+        # First call computes the 10 seeds once, plus the article itself.
+        assert mock_embed.call_count == 11
+
         module.is_relevant({"title": "c", "content": "d"})
         module.is_relevant({"title": "e", "content": "f"})
-
-        assert mock_embed.call_count == seed_call_count + 3
+        # Seeds are cached; only the article is embedded on subsequent calls.
+        assert mock_embed.call_count == 13

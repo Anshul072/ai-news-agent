@@ -1,38 +1,40 @@
 import threading
 
-from sentence_transformers import SentenceTransformer
-
 import config
 
-# Cap torch CPU threads before the model runs so embedding can't monopolise
-# every core and starve the in-process Streamlit UI thread. Best-effort: if
-# torch isn't importable or the value is rejected, fall back to its default.
-try:
-    import torch
-
-    torch.set_num_threads(config.EMBED_TORCH_THREADS)
-except Exception:
-    pass
-
-_model: SentenceTransformer | None = None
+# We embed with fastembed (ONNX Runtime) rather than sentence-transformers.
+# sentence-transformers pulls in torch, whose import alone is ~20s and holds the
+# GIL in long bursts — loading it in-process froze the Streamlit UI for the whole
+# load window. fastembed imports in ~1s, loads the same BAAI/bge-base-en-v1.5 in
+# under a second, and produces embeddings that are cosine-identical to the
+# sentence-transformers output (so already-stored ChromaDB vectors stay valid).
+# The import is still deferred to first use to keep module import cheap.
+_model = None
 _lock = threading.Lock()
 
 
-def _get_model() -> SentenceTransformer:
+def _get_model():
     global _model
     if _model is None:
         with _lock:
             if _model is None:
-                _model = SentenceTransformer("BAAI/bge-base-en-v1.5")
+                from fastembed import TextEmbedding
+
+                # Cap ONNX Runtime threads so a large batch can't grab every core
+                # and starve the in-process Streamlit UI thread during a fetch.
+                _model = TextEmbedding(
+                    "BAAI/bge-base-en-v1.5",
+                    threads=config.EMBED_TORCH_THREADS,
+                )
     return _model
 
 
 def embed(text: str) -> list[float]:
-    return _get_model().encode(text).tolist()
+    return embed_many([text])[0]
 
 
 def embed_many(texts: list[str]) -> list[list[float]]:
-    """Embed a list of texts in a single batched ``encode()`` forward pass."""
+    """Embed a list of texts in a single batched pass, preserving input order."""
     if not texts:
         return []
-    return _get_model().encode(texts).tolist()
+    return [vec.tolist() for vec in _get_model().embed(list(texts))]
