@@ -6,6 +6,9 @@ __pycache__/
 .pytest_cache/
 storage/chroma_db/
 storage/news.db
+storage/news.db-shm
+storage/news.db-wal
+SUMMARY.md
 .agents/
 .claude/
 eval/results/
