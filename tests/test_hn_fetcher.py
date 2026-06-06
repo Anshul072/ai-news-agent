@@ -16,6 +16,28 @@ def _item_response(story_id: str) -> dict:
     return {"id": story_id, "children": []}
 
 
+def _hit(object_id: str, title: str, points: int = 50, num_comments: int = 10) -> dict:
+    return {"objectID": object_id, "title": title, "points": points, "num_comments": num_comments}
+
+
+def _search_then_items(url_hits, keyword_hits):
+    """side_effect distinguishing /search calls (URL search, then keyword search)
+    from per-story /items/ fetches. Returns (side_effect, search_call_counter)."""
+    search_calls = [0]
+
+    def side_effect(url, params=None, timeout=None):
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        if "/search" in url:
+            search_calls[0] += 1
+            resp.json.return_value = {"hits": url_hits if search_calls[0] == 1 else keyword_hits}
+        else:  # /items/<id>
+            resp.json.return_value = _item_response(url.rstrip("/").split("/")[-1])
+        return resp
+
+    return side_effect, search_calls
+
+
 def _mock_requests_get(url_search_hits, keyword_hits=None):
     """Return a mock for requests.get.
 
@@ -193,11 +215,64 @@ def test_similarity_filter_removes_low_scoring_hits():
 # ---------------------------------------------------------------------------
 
 def test_results_capped_at_limit():
-    hits = [_algolia_hit(str(i), f"Claude story {i}", points=50) for i in range(10)]
+    hits = [_hit(str(i), f"Claude story {i}", num_comments=50) for i in range(10)]
+    side_effect, _ = _search_then_items(url_hits=[], keyword_hits=hits)
 
-    with patch("tools.hn_fetcher.requests.get",
-               side_effect=_mock_requests_get([], keyword_hits=hits)), \
+    with patch("tools.hn_fetcher.requests.get", side_effect=side_effect), \
          patch("tools.hn_fetcher.embed", return_value=[1.0, 0.0]):
-        threads = fetch_hn_threads(["Claude"], limit=3)
+        threads = fetch_hn_threads(["Claude"], article_url="https://example.com/a", limit=3)
 
-    assert len(threads) <= 3
+    assert len(threads) == 3
+
+
+# ---------------------------------------------------------------------------
+# Dupe handling: recover the canonical discussion post
+# ---------------------------------------------------------------------------
+
+def test_dupe_url_hit_triggers_keyword_search_for_canonical():
+    # The exact-URL submission is a locked dupe with no discussion; the canonical
+    # post (different submission, lots of comments) must be recovered.
+    dupe = _hit("100", "Claude Opus 4.8", points=5, num_comments=0)
+    canonical = _hit("200", "Claude Opus 4.8 Released", points=300, num_comments=120)
+    side_effect, search_calls = _search_then_items(url_hits=[dupe], keyword_hits=[canonical])
+
+    with patch("tools.hn_fetcher.requests.get", side_effect=side_effect), \
+         patch("tools.hn_fetcher.embed", return_value=[1.0, 0.0]):
+        threads = fetch_hn_threads(
+            ["Claude", "Opus"], article_url="https://anthropic.com/news/claude-opus-4-8"
+        )
+
+    assert search_calls[0] == 2  # URL search found only a dupe → keyword search ran
+    urls = [t["url"] for t in threads]
+    assert "https://news.ycombinator.com/item?id=200" in urls  # canonical recovered
+    assert threads[0]["title"] == "Claude Opus 4.8 Released"   # ranked first by engagement
+
+
+def test_url_hit_with_discussion_skips_keyword_search():
+    canonical = _hit("200", "Claude Opus 4.8 Released", points=300, num_comments=120)
+    side_effect, search_calls = _search_then_items(
+        url_hits=[canonical], keyword_hits=[_hit("999", "Unrelated", num_comments=500)]
+    )
+
+    with patch("tools.hn_fetcher.requests.get", side_effect=side_effect), \
+         patch("tools.hn_fetcher.embed") as mock_embed:
+        threads = fetch_hn_threads(["Claude"], article_url="https://anthropic.com/news/x")
+
+    assert search_calls[0] == 1  # URL hit already has discussion → no keyword search
+    mock_embed.assert_not_called()
+    assert len(threads) == 1
+
+
+def test_threads_ranked_by_engagement():
+    hits = [
+        _hit("1", "Claude low", points=10, num_comments=2),
+        _hit("2", "Claude high", points=200, num_comments=90),
+        _hit("3", "Claude mid", points=50, num_comments=40),
+    ]
+    side_effect, _ = _search_then_items(url_hits=[], keyword_hits=hits)
+
+    with patch("tools.hn_fetcher.requests.get", side_effect=side_effect), \
+         patch("tools.hn_fetcher.embed", return_value=[1.0, 0.0]):
+        threads = fetch_hn_threads(["Claude"], article_url="https://example.com/a")
+
+    assert [t["title"] for t in threads] == ["Claude high", "Claude mid", "Claude low"]
